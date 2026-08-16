@@ -45,10 +45,6 @@ Responsables de orientar de manera conjunta la estrategia técnica, analítica, 
 
 ### Coordinación del Proyecto
 
-Responsable de coordinar transversalmente los componentes de ingeniería de datos y analítica, garantizando la articulación entre los equipos técnicos, el seguimiento de actividades y la integración de los resultados del proyecto.
-
-**Integrante:**
-
 - **Juan Pablo Arias Buitrago**  
   **Data Scientist & Technical Project Coordinator**  
   Responsable de la coordinación operativa del proyecto, seguimiento de actividades y entregables, articulación entre `dragons-data-etl` y `dragons-data-analytics`, validación de requerimientos, acompañamiento en la integración de los datos recolectados y apoyo en los procesos analíticos del proyecto.  
@@ -89,12 +85,9 @@ Responsables del desarrollo de los componentes de adquisición, transformación,
 
 ### Coordinación de Dominio y Validación Científica
 
-Responsable de coordinar transversalmente la perspectiva temática y científica del proyecto, garantizando que las fuentes, consultas, criterios de selección, corpus y resultados analíticos mantengan pertinencia y coherencia con los objetivos del componente de biodiversidad.
-
-**Integrante:**
-
 - **Pabla Lozano Ramírez**  
-  **Biodiversity Domain Lead & Research Coordinator**  
+  **Biodiversity Domain Lead & Research Coordinator**
+  Responsable de coordinar transversalmente la perspectiva temática y científica del proyecto, garantizando que las fuentes, consultas, criterios de selección, corpus y resultados analíticos mantengan pertinencia y coherencia con los objetivos del componente de biodiversidad.
   📧 [pabla-lozano@javeriana.edu.co](mailto:pabla-lozano@javeriana.edu.co)
 
 ---
