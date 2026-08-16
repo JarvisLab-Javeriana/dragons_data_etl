@@ -19,15 +19,27 @@ El objetivo es construir un flujo reproducible que permita consolidar texto y me
 
 ## Equipo del Proyecto
 
-### Dirección Técnica y Analítica
+### Dirección del Proyecto
 
-Responsable de orientar la arquitectura, metodología y estrategia técnica general del proyecto.
+Responsables de orientar de manera conjunta la estrategia técnica, analítica, científica y temática del componente, asegurando la articulación entre la ingeniería de datos, la analítica y los objetivos de investigación en biodiversidad.
 
-* **PhD Luis Gabriel Moreno Sandoval**
+**Integrantes:**
+
+- **PhD Luis Gabriel Moreno Sandoval**  
   **Technical & Data Analytics Lead**
+  JDocente Jefe de Sección, Departamento de Ingeniería de Sistemas
   Pontificia Universidad Javeriana
-  Dirección técnica y metodológica, definición de arquitectura, seguimiento y validación de los componentes desarrollados.
+    
+  Responsable de la dirección técnica y metodológica del componente de datos, definición de arquitectura, estrategia de analítica e inteligencia artificial, seguimiento del desarrollo tecnológico y validación de los productos técnicos y analíticos.  
   📧 [morenoluis@javeriana.edu.co](mailto:morenoluis@javeriana.edu.co)
+
+- **PhD Juan David Amaya Espinel**  
+  **Biodiversity Research & Domain Lead**  
+  Docente Asociado, Departamento de Ecología y Territorio  
+  Pontificia Universidad Javeriana  
+
+  Responsable del liderazgo científico y temático del componente de biodiversidad. Orienta la definición de las preguntas de investigación, los criterios conceptuales para la selección y evaluación de las fuentes, y la interpretación de los resultados desde el conocimiento experto del dominio.
+  📧 [jamayae@javeriana.edu.co](mailto:jamayae@javeriana.edu.co)  
 
 ---
 
@@ -53,7 +65,7 @@ Responsable de orientar y ejecutar los principales procesos de análisis sobre l
 - **Sergio Pardo Hurtado**  
   **NLP Data Scientist & Lead Data Analyst**  
   Participa en el componente ETL desde la perspectiva analítica, apoyando la definición de campos, variables y criterios de calidad requeridos para los análisis posteriores. Es responsable principal del componente analítico, incluyendo la construcción y validación de la vista minable, análisis estadístico, procesamiento de lenguaje natural, evaluación de modelos de inteligencia artificial y generación de resultados analíticos.  
-  📧 [correo@javeriana.edu.co](mailto:sergio_pardo@javeriana.edu.co)
+  📧 [sergio_pardo@javeriana.edu.co](mailto:sergio_pardo@javeriana.edu.co)
 
 ---
 
@@ -68,28 +80,22 @@ Responsables del desarrollo de los componentes de adquisición, transformación,
   Responsable del desarrollo de conectores, integración con fuentes externas, procesos de extracción y transformación, persistencia en MongoDB, servicios de comunicación entre componentes y soporte de plataforma.  
   📧 [gomezlv@javeriana.edu.co](mailto:gomezlv@javeriana.edu.co)
 
-- **Marlon [Apellido]**  
+- **Marlon Jhoan Garcia Restrepo**  
   **Data Engineer & DevOps Engineer**  
   Responsable del desarrollo y mantenimiento de pipelines ETL, calidad y almacenamiento de datos, automatización, configuración de ambientes, contenerización, integración continua, despliegue y soporte de la infraestructura técnica del proyecto.  
-  📧 [correo@javeriana.edu.co](mailto:mjgarcia@javeriana.edu.co)
+  📧 [mjgarcia@javeriana.edu.co](mailto:mjgarcia@javeriana.edu.co)
 
 ---
 
-### Experta de Dominio y Validación
+### Coordinación de Dominio y Validación Científica
 
-Responsable de apoyar la validación conceptual de las fuentes y del corpus recolectado.
+Responsable de coordinar transversalmente la perspectiva temática y científica del proyecto, garantizando que las fuentes, consultas, criterios de selección, corpus y resultados analíticos mantengan pertinencia y coherencia con los objetivos del componente de biodiversidad.
 
-* **Pabla Lozano Ramírez**
-  **Biodiversity Domain Expert & Data Source Validator**
-  Pontificia Universidad Javeriana
+**Integrante:**
 
-  Participa en la validación de:
-
-  * pertinencia temática de las fuentes;
-  * selección de medios y contenidos;
-  * relevancia de los términos y consultas de búsqueda;
-  * calidad temática del corpus recolectado;
-  * pertinencia de nuevas fuentes propuestas por el equipo técnico.
+- **Pabla Lozano Ramírez**  
+  **Biodiversity Domain Lead & Research Coordinator**  
+  📧 [pabla-lozano@javeriana.edu.co](mailto:pabla-lozano@javeriana.edu.co)
 
 ---
 
