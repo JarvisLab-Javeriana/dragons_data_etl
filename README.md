@@ -45,10 +45,21 @@ Responsables de orientar de manera conjunta la estrategia técnica, analítica, 
 
 ### Coordinación del Proyecto
 
+Responsables de coordinar transversalmente la ejecución del componente ETL, articulando las necesidades técnicas de adquisición y procesamiento de datos con los criterios científicos y temáticos del dominio de biodiversidad.
+
+**Integrantes:**
+
 - **Juan Pablo Arias Buitrago**  
   **Data Scientist & Technical Project Coordinator**  
-  Responsable de la coordinación operativa del proyecto, seguimiento de actividades y entregables, articulación entre `dragons-data-etl` y `dragons-data-analytics`, validación de requerimientos, acompañamiento en la integración de los datos recolectados y apoyo en los procesos analíticos del proyecto.  
+
+  Responsable de la coordinación operativa y técnica del proyecto, seguimiento de actividades y entregables, articulación entre `dragons-data-etl` y `dragons-data-analytics`, definición de requerimientos de datos, seguimiento de los procesos de adquisición, transformación y calidad, y validación de que la información producida por el ETL pueda ser utilizada posteriormente en la construcción de la vista minable y los procesos analíticos.  
   📧 [ariasj.u@javeriana.edu.co](mailto:ariasj.u@javeriana.edu.co)
+
+- **Pabla Lozano Ramírez**  
+  **Biodiversity Domain Lead & Research Project Coordinator**  
+
+  Responsable de la coordinación científica y temática del componente ETL, apoyando la definición y validación de las fuentes de información, términos y consultas de búsqueda, criterios de selección de contenidos y pertinencia del corpus recolectado. Asimismo, participa en la revisión de la calidad temática de los datos y en la validación de que las fuentes y registros adquiridos sean coherentes con los objetivos de investigación en biodiversidad.  
+  📧 [pabla-lozano@javeriana.edu.co](mailto:pabla-lozano@javeriana.edu.co)
 
 ---
 
@@ -80,15 +91,6 @@ Responsables del desarrollo de los componentes de adquisición, transformación,
   **Data Engineer & DevOps Engineer**  
   Responsable del desarrollo y mantenimiento de pipelines ETL, calidad y almacenamiento de datos, automatización, configuración de ambientes, contenerización, integración continua, despliegue y soporte de la infraestructura técnica del proyecto.  
   📧 [mjgarcia@javeriana.edu.co](mailto:mjgarcia@javeriana.edu.co)
-
----
-
-### Coordinación de Dominio y Validación Científica
-
-- **Pabla Lozano Ramírez**  
-  **Biodiversity Domain Lead & Research Coordinator**
-  Responsable de coordinar transversalmente la perspectiva temática y científica del proyecto, garantizando que las fuentes, consultas, criterios de selección, corpus y resultados analíticos mantengan pertinencia y coherencia con los objetivos del componente de biodiversidad.
-  📧 [pabla-lozano@javeriana.edu.co](mailto:pabla-lozano@javeriana.edu.co)
 
 ---
 
