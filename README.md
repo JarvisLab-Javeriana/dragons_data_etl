@@ -2,10 +2,10 @@
 
 ### Componente de Ingeniería de Datos del proyecto DRAGONS
 
-**Proyecto:** DRAGONS – *Diffusing biodiversity Response-able Action and awareness raising through citizen empowerment, inclusive engagement and innovative Governance of Nature and Society*
-**Componente:** WP1 – Understanding societal perceptions, awareness, and engagement responses to biodiversity loss
-**Institución:** Pontificia Universidad Javeriana
-**Repositorio relacionado:** `dragons-data-analytics`
+- **Proyecto:** DRAGONS – *Diffusing biodiversity Response-able Action and awareness raising through citizen empowerment, inclusive engagement and innovative Governance of Nature and Society*
+- **Componente:** WP1 – Understanding societal perceptions, awareness, and engagement responses to biodiversity loss
+- **Institución:** Pontificia Universidad Javeriana
+- **Repositorio relacionado:** `dragons-data-analytics`
 
 ---
 
