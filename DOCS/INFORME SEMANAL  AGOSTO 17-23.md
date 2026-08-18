@@ -137,3 +137,5 @@ Esta es el área con más limitaciones actuales, y es importante ser honesto con
 - https://trafilatura.readthedocs.io/en/latest/evaluation.html
 
 # INFORME SEMANAL - AGOSTO 17-23 (MARLON)
+
+# Costos apify
