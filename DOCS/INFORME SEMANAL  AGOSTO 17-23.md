@@ -135,3 +135,5 @@ Esta es el área con más limitaciones actuales, y es importante ser honesto con
 - https://github.com/AndyTheFactory/newspaper4k
 - https://www.contextractor.com/trafilatura-vs-readability-vs-newspaper/
 - https://trafilatura.readthedocs.io/en/latest/evaluation.html
+
+# INFORME SEMANAL - AGOSTO 17-23 (MARLON)
