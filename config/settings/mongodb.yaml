@@ -1,0 +1,13 @@
+uri: "${MONGODB_URI}"
+database: "${MONGODB_DATABASE}"
+
+collections:
+  gkg_records: gkg_records
+  execution_metrics: execution_metrics
+
+connect_timeout_ms: 5000
+server_selection_timeout_ms: 5000
+
+ordered_inserts: false  
+
+ensure_indexes_on_startup: true

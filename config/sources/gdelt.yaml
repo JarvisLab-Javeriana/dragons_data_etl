@@ -1,0 +1,25 @@
+source: gdelt
+
+dataset:
+  project: gdelt-bq
+  dataset: gdeltv2
+  table: gkg_partitioned
+
+keywords:
+  - biodiversity
+
+date_range:
+  start: "2020-01-01"
+  end: "2020-02-01"
+
+max_rows: 100000
+
+batch_size: 1000
+
+mode: test
+
+save_to_mongodb: false
+
+save_metrics: true
+
+max_bytes_billed: 5000000000  # 5 GB
