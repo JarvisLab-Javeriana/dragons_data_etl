@@ -1,3 +1,26 @@
+# Actualización del informe ejecutivo: avances y entregables de la Tarea 1.1
+
+El equipo técnico avanzó en la organización de la metodología y en la exploración inicial de medios digitales para la Tarea 1.1. Este trabajo permitió consolidar propuestas metodológicas, revisar las fuentes sugeridas por los socios y generar muestras que sirven como insumo para las siguientes decisiones del equipo investigador.
+
+En la carpeta `docs` del repositorio se encuentra el documento [`Metodologia_task1.1.md`](https://github.com/JarvisLab-Javeriana/dragons_data_etl/blob/main/docs/Metodologia_task1.1.md). Allí se organizaron conceptos, alcances, limitaciones y posibles estrategias para la búsqueda, recopilación y validación de información. El documento no representa una metodología definitiva: reúne recomendaciones técnicas que deberán revisarse con los socios y expertos investigadores para definir conjuntamente los criterios finales de la tarea.
+
+Como punto de partida para la exploración de noticias, se tomaron los medios propuestos por los socios del proyecto:
+
+* **Hungría:** *Index*, *Telex* y *Magyar Nemzet*.
+* **Reino Unido:** *The Guardian*, BBC y *Daily Mail*.
+* **Colombia:** *El Tiempo* y *El Espectador*.
+
+El equipo técnico utilizó Media Cloud mediante su página web y su API. Primero se consultó la cantidad de noticias asociadas con biodiversidad disponibles para los medios definidos por los socios. Después se realizaron búsquedas en las colecciones nacionales de Colombia, Reino Unido y Hungría para identificar otros medios con una presencia relevante de noticias relacionadas con el tema. Cada registro encontrado representa una noticia o artículo periodístico y contiene principalmente datos descriptivos, como el medio, el título, la fecha y el enlace de publicación.
+
+La metodología, los medios revisados y los resultados generales de esta exploración se documentaron en [`NATIONAL_MEDIA_CANDIDATES.MD`](https://github.com/JarvisLab-Javeriana/dragons_data_etl/blob/main/docs/NATIONAL_MEDIA_CANDIDATES.MD). Las consultas, exportaciones, muestras y resultados obtenidos se encuentran en la carpeta [`experiments/source_discovery`](https://github.com/JarvisLab-Javeriana/dragons_data_etl/tree/main/experiments/source_discovery).
+
+A partir de esta exploración se definió Media Cloud como una fuente útil para descubrir medios, estimar el volumen inicial de noticias y obtener sus enlaces y datos descriptivos. Sin embargo, la herramienta no proporciona necesariamente el contenido completo de cada noticia. Para la recolección posterior, el equipo técnico deberá desarrollar un extractor específico para cada medio, de acuerdo con su estructura y con la información disponible. Esto permitirá recuperar, cuando sea posible, el texto de la noticia, su autor, fecha de publicación, contenido multimedia, reacciones, veces compartida y comentarios.
+
+Los medios identificados todavía deben ser validados por los socios y expertos investigadores. Esta revisión permitirá decidir cuáles se mantienen, incluyen o excluyen, así como precisar qué se entenderá por “medio nacional”: un medio originado y operado principalmente en el país o también un medio multinacional que publica noticias sobre dicho territorio. Conforme avance la recopilación, el equipo técnico actualizará las métricas y las muestras para facilitar esta validación y ajustar los filtros cuando sea necesario.
+
+> **Importante:** los resultados actuales corresponden a una primera exploración y no constituyen el corpus definitivo. El equipo técnico ya cuenta con un listado ampliado de palabras clave que permitirá buscar una mayor cantidad de medios y artículos. La selección final dependerá de la validación temática y territorial realizada conjuntamente con los socios del proyecto.
+
+
 # Informe ejecutivo de la herramienta GDELT
 
 # Eventos/temas controversiales que pudieron disparar interacciones o fomentar opiniones (Att Pabla)
