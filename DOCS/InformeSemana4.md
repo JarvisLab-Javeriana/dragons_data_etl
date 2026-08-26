@@ -2,7 +2,7 @@
 
 El equipo técnico avanzó en la organización de la metodología y en la exploración inicial de medios digitales para la Tarea 1.1. Este trabajo permitió consolidar propuestas metodológicas, revisar las fuentes sugeridas por los socios y generar muestras que sirven como insumo para las siguientes decisiones del equipo investigador.
 
-En la carpeta `docs` del repositorio se encuentra el documento [`Metodologia_task1.1.md`](https://github.com/JarvisLab-Javeriana/dragons_data_etl/blob/main/docs/Metodologia_task1.1.md). Allí se organizaron conceptos, alcances, limitaciones y posibles estrategias para la búsqueda, recopilación y validación de información. El documento no representa una metodología definitiva: reúne recomendaciones técnicas que deberán revisarse con los socios y expertos investigadores para definir conjuntamente los criterios finales de la tarea.
+En la carpeta `docs` del repositorio se encuentra el documento [`Metodologia_task1.1.md`](https://github.com/JarvisLab-Javeriana/dragons_data_etl/blob/main/DOCS/Metodologia_task1.1.md)). Allí se organizaron conceptos, alcances, limitaciones y posibles estrategias para la búsqueda, recopilación y validación de información. El documento no representa una metodología definitiva: reúne recomendaciones técnicas que deberán revisarse con los socios y expertos investigadores para definir conjuntamente los criterios finales de la tarea.
 
 Como punto de partida para la exploración de noticias, se tomaron los medios propuestos por los socios del proyecto:
 
