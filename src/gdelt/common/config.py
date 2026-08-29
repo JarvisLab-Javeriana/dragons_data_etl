@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv
 
-from src.common.exceptions import ConfigurationError
+from src.gdelt.common.exceptions import ConfigurationError
 
 # Load .env once, as early as possible, without overriding variables the
 # shell/CI environment may have already exported.

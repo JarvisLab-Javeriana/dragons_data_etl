@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.processing.normalizer import normalize_gkg_row
+from src.gdelt.processing.normalizer import normalize_gkg_row
 
 
 def test_normalize_gkg_row_basic_fields():

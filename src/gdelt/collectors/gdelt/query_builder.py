@@ -6,7 +6,7 @@ from pathlib import Path
 
 from google.cloud import bigquery
 
-from src.common.config import DatasetConfig, PROJECT_ROOT
+from src.gdelt.common.config import DatasetConfig, PROJECT_ROOT
 
 QUERIES_DIR = PROJECT_ROOT / "queries" / "gdelt"
 

@@ -11,9 +11,9 @@ import pytest
 
 mongomock = pytest.importorskip("mongomock")
 
-from src.common.config import MongoDBConfig  # noqa: E402
-from src.database.mongodb import MongoDBConnection  # noqa: E402
-from src.database.repositories import (  # noqa: E402
+from src.gedelt.collectors.common.config import MongoDBConfig  # noqa: E402
+from src.gdelt.database.mongodb import MongoDBConnection  # noqa: E402
+from src.gdelt.database.repositories import (  # noqa: E402
     ExecutionMetricsRepository,
     GkgRecordsRepository,
     initialize_database,

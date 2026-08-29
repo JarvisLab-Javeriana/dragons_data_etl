@@ -1,0 +1,5 @@
+2026-08-24 15:03:40 | ERROR    | GDELT.src.gdelt.collectors.gdelt.bigquery_client | BigQuery job failed: 400 POST https://bigquery.googleapis.com/bigquery/v2/projects/dragons-data-etl/jobs?prettyPrint=false: Invalid value at 'job.configuration.query.maximum_bytes_billed.value' (TYPE_INT64), "None"
+
+Location: None
+Job ID: 16b356b9-61bd-4905-8707-11d501a85374
+ [{'@type': 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations': [{'field': 'job.configuration.query.maximum_bytes_billed.value', 'description': 'Invalid value at \'job.configuration.query.maximum_bytes_billed.value\' (TYPE_INT64), "None"'}]}]

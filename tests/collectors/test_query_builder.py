@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from src.collectors.gdelt import query_builder
-from src.common.config import DatasetConfig
+from src.gdelt.collectors.gdelt import query_builder
+from src.gedelt.collectors.common.config import DatasetConfig
 
 DATASET = DatasetConfig(project="gdelt-bq", dataset="gdeltv2", table="gkg_partitioned")
 

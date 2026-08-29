@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.quality.validators import DEFAULT_VALIDATORS, validate_document
+from src.gdelt.quality.validators import DEFAULT_VALIDATORS, validate_document
 
 
 @dataclass

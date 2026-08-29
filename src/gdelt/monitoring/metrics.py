@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from src.common.utils import utcnow
+from src.gdelt.common.utils import utcnow
 
 
 @dataclass

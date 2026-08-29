@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.gdelt.collectors.gdelt.collector import GdeltCollector  # noqa: E402
+from src.gdelt.collectors import GdeltCollector  # noqa: E402
 from src.gdelt.common.config import PROJECT_ROOT, load_gdelt_config, load_pipeline_config  # noqa: E402
 from src.gdelt.common.exceptions import DragonsDataETLError  # noqa: E402
 from src.gdelt.common.logging import configure_logging  # noqa: E402

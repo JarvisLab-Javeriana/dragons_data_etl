@@ -5,8 +5,8 @@ import logging
 import time
 from typing import Any
 
-from src.collectors.gdelt.collector import GdeltCollector
-from src.common.config import (
+from src.gdelt.collectors.gdelt.collector import GdeltCollector
+from src.gdelt.common.config import (
     GdeltSourceConfig,
     MongoDBConfig,
     PipelineConfig,
@@ -14,20 +14,20 @@ from src.common.config import (
     load_mongodb_config,
     load_pipeline_config,
 )
-from src.common.exceptions import DragonsDataETLError, ResourceLimitError
-from src.common.utils import chunked, new_run_id, utcnow
-from src.database.mongodb import MongoDBConnection
-from src.database.repositories import (
+from src.gdelt.common.exceptions import DragonsDataETLError, ResourceLimitError
+from src.gdelt.common.utils import chunked, new_run_id, utcnow
+from src.gdelt.database.mongodb import MongoDBConnection
+from src.gdelt.database.repositories import (
     ExecutionMetricsRepository,
     GkgRecordsRepository,
     initialize_database,
 )
-from src.monitoring import execution_logger
-from src.monitoring.metrics import ErrorInfo, ExecutionMetrics
-from src.monitoring.system_metrics import SystemMonitor
-from src.processing.normalizer import normalize_gkg_row
-from src.processing.transformers import prepare_batch_for_storage
-from src.quality.checks import run_quality_checks
+from src.gdelt.monitoring import execution_logger
+from src.gdelt.monitoring.metrics import ErrorInfo, ExecutionMetrics
+from src.gdelt.monitoring.system_metrics import SystemMonitor
+from src.gdelt.processing.normalizer import normalize_gkg_row
+from src.gdelt.processing.transformers import prepare_batch_for_storage
+from src.gdelt.quality.checks import run_quality_checks
 
 logger = logging.getLogger(__name__)
 

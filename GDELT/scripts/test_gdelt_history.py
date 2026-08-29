@@ -11,9 +11,9 @@ Results are printed as a table and written to
 `docs/experiments/history_<timestamp>.csv` for later comparison.
 
 Usage:
-    python scripts/test_gdelt_history.py
-    python scripts/test_gdelt_history.py --start-year 2015 --end-year 2026
-    python scripts/test_gdelt_history.py --start-year 2020 --end-year 2021 --keywords biodiversity climate
+    python GDELT/scripts/test_gdelt_history.py
+    python GDELT/scripts/test_gdelt_history.py --start-year 2015 --end-year 2026
+    python GDELT/scripts/test_gdelt_history.py --start-year 2020 --end-year 2021 --keywords biodiversity climate
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.gdelt.collectors.gdelt.collector import GdeltCollector  # noqa: E402
-from src.gdelt.common.config import PROJECT_ROOT, load_gdelt_config, load_pipeline_config  # noqa: E402
-from src.gdelt.common.exceptions import DragonsDataETLError  # noqa: E402
-from src.gdelt.common.logging import configure_logging  # noqa: E402
-from src.gdelt.common.utils import utcnow  # noqa: E402
+from src.gedelt.collectors.common.config import PROJECT_ROOT, load_gdelt_config, load_pipeline_config  # noqa: E402
+from src.gedelt.collectors.common.exceptions import DragonsDataETLError  # noqa: E402
+from src.gedelt.collectors.common.logging import configure_logging  # noqa: E402
+from src.gedelt.collectors.common.utils import utcnow  # noqa: E402
 
 import logging  # noqa: E402
 

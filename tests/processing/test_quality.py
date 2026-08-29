@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from src.quality.checks import run_quality_checks
-from src.quality.validators import validate_document
+from src.gdelt.quality.checks import run_quality_checks
+from src.gdelt.quality.validators import validate_document
 
 
 def _valid_document(**overrides):

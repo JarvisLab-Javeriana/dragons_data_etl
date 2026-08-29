@@ -4,8 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.database.repositories import ExecutionMetricsRepository
-from src.monitoring.metrics import ExecutionMetrics
+from src.gdelt.database.repositories import ExecutionMetricsRepository
+from src.gdelt.monitoring.metrics import ExecutionMetrics
 
 logger = logging.getLogger(__name__)
 

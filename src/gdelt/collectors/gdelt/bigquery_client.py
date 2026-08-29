@@ -9,8 +9,8 @@ from typing import Any
 from google.api_core.exceptions import GoogleAPIError
 from google.cloud import bigquery
 
-from src.collectors.gdelt.query_builder import PreparedQuery
-from src.common.exceptions import BigQueryError
+from src.gdelt.collectors.gdelt.query_builder import PreparedQuery
+from src.gdelt.common.exceptions import BigQueryError
 
 logger = logging.getLogger(__name__)
 
