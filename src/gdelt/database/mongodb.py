@@ -7,8 +7,8 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
 
-from src.common.config import MongoDBConfig
-from src.common.exceptions import MongoDBError
+from src.gdelt.common.config import MongoDBConfig
+from src.gdelt.common.exceptions import MongoDBError
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from src.processing.transformers import (
+from src.gdelt.processing.transformers import (
     deduplicate_batch,
     make_bson_safe,
     prepare_batch_for_storage,

@@ -7,10 +7,10 @@ from typing import Any
 
 from pymongo.errors import BulkWriteError, PyMongoError
 
-from src.common.config import MongoDBConfig
-from src.common.exceptions import MongoDBError
-from src.database.collections import ensure_indexes
-from src.database.mongodb import MongoDBConnection
+from src.gdelt.common.config import MongoDBConfig
+from src.gdelt.common.exceptions import MongoDBError
+from src.gdelt.database.collections import ensure_indexes
+from src.gdelt.database.mongodb import MongoDBConnection
 
 logger = logging.getLogger(__name__)
 

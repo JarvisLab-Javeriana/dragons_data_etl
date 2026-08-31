@@ -5,7 +5,7 @@ import logging
 import logging.handlers
 from pathlib import Path
 
-from src.common.config import PROJECT_ROOT, load_logging_config
+from src.gdelt.common.config import PROJECT_ROOT, load_logging_config
 
 _CONFIGURED = False
 

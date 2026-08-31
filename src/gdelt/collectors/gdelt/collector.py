@@ -5,10 +5,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
-from src.collectors.gdelt import query_builder
-from src.collectors.gdelt.bigquery_client import BigQueryGdeltClient, BigQueryJobMetrics
-from src.common.config import GdeltSourceConfig
-from src.common.exceptions import BigQueryError, ResourceLimitError
+from src.gdelt.collectors.gdelt import query_builder
+from src.gdelt.collectors.gdelt.bigquery_client import BigQueryGdeltClient, BigQueryJobMetrics
+from src.gdelt.common.config import GdeltSourceConfig
+from src.gdelt.common.exceptions import BigQueryError, ResourceLimitError
 
 logger = logging.getLogger(__name__)
 

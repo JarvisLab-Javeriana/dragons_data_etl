@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import psutil
 
-from src.monitoring.metrics import SystemMetrics
+from src.gdelt.monitoring.metrics import SystemMetrics
 
 logger = logging.getLogger(__name__)
 

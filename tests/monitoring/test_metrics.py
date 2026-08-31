@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.monitoring.metrics import ErrorInfo, ExecutionMetrics
-from src.monitoring.system_metrics import SystemMonitor
+from src.gdelt.monitoring.metrics import ErrorInfo, ExecutionMetrics
+from src.gdelt.monitoring.system_metrics import SystemMonitor
 
 
 def test_execution_metrics_mark_success_sets_status_and_timestamp():

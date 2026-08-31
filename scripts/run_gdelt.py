@@ -21,10 +21,10 @@ from pathlib import Path
 # Allow running as `python scripts/run_gdelt.py` from the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.common.config import load_gdelt_config  # noqa: E402
-from src.common.exceptions import DragonsDataETLError  # noqa: E402
-from src.common.logging import configure_logging  # noqa: E402
-from src.pipelines.gdelt_pipeline import GdeltPipeline  # noqa: E402
+from src.gdelt.common.config import load_gdelt_config  # noqa: E402
+from src.gdelt.common.exceptions import DragonsDataETLError  # noqa: E402
+from src.gdelt.common.logging import configure_logging  # noqa: E402
+from src.gdelt.pipelines.gdelt_pipeline import GdeltPipeline  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
