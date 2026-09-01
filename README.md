@@ -1,115 +1,118 @@
 # 🐉 DRAGONS Data ETL
 
-### Componente de Ingeniería de Datos del proyecto DRAGONS
+### Data Engineering Component of the DRAGONS Project
 
-- **Proyecto:** DRAGONS – *Diffusing biodiversity Response-able Action and awareness raising through citizen empowerment, inclusive engagement and innovative Governance of Nature and Society*
-- **Componente:** WP1 – Understanding societal perceptions, awareness, and engagement responses to biodiversity loss
-- **Institución:** Pontificia Universidad Javeriana
-- **Repositorio relacionado:** `dragons-data-analytics`
-
----
-
-## Objetivo
-
-Desarrollar el componente de ingeniería de datos encargado de recolectar, transformar, validar y almacenar información proveniente de fuentes públicas o autorizadas en línea, incluyendo redes sociales, medios de comunicación y otros mecanismos de adquisición permitidos.
-
-El objetivo es construir un flujo reproducible que permita consolidar texto y metadatos en una base documental MongoDB, garantizando trazabilidad, calidad y disponibilidad para su posterior explotación en el repositorio `dragons-data-analytics`.
+- **Project:** DRAGONS – *Diffusing biodiversity Response-able Action and awareness raising through citizen empowerment, inclusive engagement and innovative Governance of Nature and Society*
+- **Work Package:** WP1 – Understanding societal perceptions, awareness, and engagement responses to biodiversity loss
+- **Institution:** Pontificia Universidad Javeriana
+- **Related Repository:** `dragons-data-analytics`
 
 ---
 
-## Equipo del Proyecto
+## Objective
 
-### Dirección del Proyecto
+Develop the data engineering component responsible for collecting, transforming, validating, and storing information obtained from public or authorised online sources, including social media, news outlets, and other permitted data acquisition mechanisms.
 
-Responsables de orientar de manera conjunta la estrategia técnica, analítica, científica y temática del componente, asegurando la articulación entre la ingeniería de datos, la analítica y los objetivos de investigación en biodiversidad.
+The main objective is to build a reproducible data workflow capable of consolidating textual content and metadata into a MongoDB document database, ensuring traceability, data quality, and availability for subsequent use by the `dragons-data-analytics` repository.
 
-**Integrantes:**
+---
+
+## Project Team
+
+### Project Leadership
+
+Responsible for jointly guiding the technical, analytical, scientific, and domain strategy of the component, ensuring alignment between data engineering, analytics, and the biodiversity research objectives.
+
+**Members:**
 
 - **PhD Luis Gabriel Moreno Sandoval**  
-  **Technical & Data Analytics Lead**
-  JDocente Jefe de Sección, Departamento de Ingeniería de Sistemas
-  Pontificia Universidad Javeriana
-    
-  Responsable de la dirección técnica y metodológica del componente de datos, definición de arquitectura, estrategia de analítica e inteligencia artificial, seguimiento del desarrollo tecnológico y validación de los productos técnicos y analíticos.  
+  **Technical & Data Analytics Lead**  
+  Section Head and Faculty Member, Department of Systems Engineering  
+  Pontificia Universidad Javeriana  
+
+  Responsible for the technical and methodological direction of the data component, architecture definition, analytics and artificial intelligence strategy, technical oversight, and validation of engineering and analytical deliverables.  
   📧 [morenoluis@javeriana.edu.co](mailto:morenoluis@javeriana.edu.co)
 
 - **PhD Juan David Amaya Espinel**  
   **Biodiversity Research & Domain Lead**  
-  Docente Asociado, Departamento de Ecología y Territorio  
+  Associate Professor, Department of Ecology and Territory  
   Pontificia Universidad Javeriana  
 
-  Responsable del liderazgo científico y temático del componente de biodiversidad. Orienta la definición de las preguntas de investigación, los criterios conceptuales para la selección y evaluación de las fuentes, y la interpretación de los resultados desde el conocimiento experto del dominio.
-  📧 [jamayae@javeriana.edu.co](mailto:jamayae@javeriana.edu.co)  
+  Responsible for the scientific and thematic leadership of the biodiversity component. He guides the definition of research questions, conceptual criteria for source selection and evaluation, and the interpretation of results from the biodiversity domain perspective.  
+  📧 [jamayae@javeriana.edu.co](mailto:jamayae@javeriana.edu.co)
 
 ---
 
-### Coordinación del Proyecto
+### Project Coordination
 
-Responsables de coordinar transversalmente la ejecución del componente ETL, articulando las necesidades técnicas de adquisición y procesamiento de datos con los criterios científicos y temáticos del dominio de biodiversidad.
+Responsible for coordinating the execution of the ETL component across technical and domain workstreams, connecting data acquisition and processing requirements with the scientific criteria of the biodiversity research component.
 
-**Integrantes:**
+**Members:**
 
 - **Juan Pablo Arias Buitrago**  
   **Data Scientist & Technical Project Coordinator**  
 
-  Responsable de la coordinación operativa y técnica del proyecto, seguimiento de actividades y entregables, articulación entre `dragons-data-etl` y `dragons-data-analytics`, definición de requerimientos de datos, seguimiento de los procesos de adquisición, transformación y calidad, y validación de que la información producida por el ETL pueda ser utilizada posteriormente en la construcción de la vista minable y los procesos analíticos.  
+  Responsible for the operational and technical coordination of the project, activity and deliverable tracking, integration between `dragons-data-etl` and `dragons-data-analytics`, definition of data requirements, monitoring of acquisition, transformation, and quality processes, and validation that ETL outputs can support the analytical dataset and downstream analysis.  
   📧 [ariasj.u@javeriana.edu.co](mailto:ariasj.u@javeriana.edu.co)
 
 - **Pabla Lozano Ramírez**  
   **Biodiversity Domain Lead & Research Project Coordinator**  
 
-  Responsable de la coordinación científica y temática del componente ETL, apoyando la definición y validación de las fuentes de información, términos y consultas de búsqueda, criterios de selección de contenidos y pertinencia del corpus recolectado. Asimismo, participa en la revisión de la calidad temática de los datos y en la validación de que las fuentes y registros adquiridos sean coherentes con los objetivos de investigación en biodiversidad.  
+  Responsible for the scientific and thematic coordination of the ETL component, supporting the definition and validation of data sources, search terms and queries, content-selection criteria, and thematic relevance of the collected corpus. She also contributes to the thematic quality review of the data and validates that acquired sources and records remain aligned with the biodiversity research objectives.  
   📧 [pabla-lozano@javeriana.edu.co](mailto:pabla-lozano@javeriana.edu.co)
 
 ---
 
-### Ciencia de Datos y Validación Analítica
+### Data Science and Analytical Validation
 
-Responsable de orientar y ejecutar los principales procesos de análisis sobre los datos recolectados, así como de apoyar la definición de los requerimientos de información necesarios desde el componente ETL.
+Responsible for supporting the definition of analytical data requirements and ensuring that the information produced by the ETL component is suitable for downstream analytics.
 
-**Integrante:**
+**Member:**
 
 - **Sergio Pardo Hurtado**  
   **NLP Data Scientist & Lead Data Analyst**  
-  Participa en el componente ETL desde la perspectiva analítica, apoyando la definición de campos, variables y criterios de calidad requeridos para los análisis posteriores. Es responsable principal del componente analítico, incluyendo la construcción y validación de la vista minable, análisis estadístico, procesamiento de lenguaje natural, evaluación de modelos de inteligencia artificial y generación de resultados analíticos.  
+
+  Participates in the ETL component from the analytical perspective, supporting the definition of fields, variables, and data-quality criteria required for downstream analysis. He also contributes to validating that the collected and transformed data are suitable for the analytical dataset, statistical analysis, NLP, and artificial intelligence processes.  
   📧 [sergio_pardo@javeriana.edu.co](mailto:sergio_pardo@javeriana.edu.co)
 
 ---
 
-### Equipo de Ingeniería de Datos y Plataforma
+### Data Engineering and Platform Team
 
-Responsables del desarrollo de los componentes de adquisición, transformación, calidad, almacenamiento e infraestructura que soportan el flujo ETL del proyecto.
+Responsible for developing the acquisition, transformation, validation, storage, and infrastructure components supporting the ETL workflow.
 
-**Integrantes:**
+**Members:**
 
 - **Viviana Gómez León**  
   **Data Engineer & Platform Developer**  
-  Responsable del desarrollo de conectores, integración con fuentes externas, procesos de extracción y transformación, persistencia en MongoDB, servicios de comunicación entre componentes y soporte de plataforma.  
+
+  Responsible for developing source connectors, integrating external data sources, implementing extraction and transformation processes, persisting data in MongoDB, supporting communication between components, and contributing to the data platform implementation.  
   📧 [gomezlv@javeriana.edu.co](mailto:gomezlv@javeriana.edu.co)
 
 - **Marlon Jhoan Garcia Restrepo**  
   **Data Engineer & DevOps Engineer**  
-  Responsable del desarrollo y mantenimiento de pipelines ETL, calidad y almacenamiento de datos, automatización, configuración de ambientes, contenerización, integración continua, despliegue y soporte de la infraestructura técnica del proyecto.  
+
+  Responsible for developing and maintaining ETL pipelines, data-quality and storage components, automation, environment configuration, containerisation, continuous integration, deployment, and technical infrastructure support.  
   📧 [mjgarcia@javeriana.edu.co](mailto:mjgarcia@javeriana.edu.co)
 
 ---
 
-## Flujo General
+## General Workflow
 
 ```text
-Fuentes públicas y autorizadas
+Public and authorised sources
              │
              ▼
-       Adquisición de datos
+       Data acquisition
              │
              ▼
-          Validación
+          Validation
              │
              ▼
-    Limpieza y normalización
+   Cleaning and normalisation
              │
              ▼
-      Control de calidad
+       Data quality
              │
              ▼
            MongoDB
@@ -120,52 +123,92 @@ Fuentes públicas y autorizadas
 
 ---
 
-## Tecnologías Principales
+## Core Technologies
 
-* **Lenguaje de programación:** Python.
-* **Base de datos:** MongoDB.
-* **Integración:** APIs REST, RSS y servicios externos.
-* **Contenedores:** Docker.
-* **Control de versiones:** Git / GitHub.
+* **Programming language:** Python
+* **Database:** MongoDB
+* **Integration:** REST APIs, RSS feeds, and external data services
+* **Containers:** Docker
+* **Version control:** Git / GitHub
 
 ---
 
-## Estructura del Proyecto
+## Project Structure
+
+The current repository structure is organised as follows:
 
 ```text
-dragons-data-etl/
+dragons_data_etl/
 │
-├── config/
-│   ├── sources/                  # Configuración de fuentes
-│   ├── queries/                  # Consultas y términos de búsqueda
-│   └── settings/                 # Parámetros generales
+├── config/                       # General project and source configuration
 │
-├── src/
-│   ├── collectors/               # Conectores y adquisición de datos
-│   ├── processing/               # Limpieza y transformación
-│   ├── quality/                  # Validaciones y calidad de datos
-│   ├── database/                 # Persistencia y acceso a MongoDB
-│   ├── pipelines/                # Flujo ETL
-│   └── common/                   # Utilidades compartidas
+├── docs/                         # Technical and data model documentation
 │
-├── scripts/                      # Scripts de ejecución
-├── tests/                        # Pruebas
-├── docs/                         # Documentación técnica
-├── .env.example                  # Variables de entorno
-├── .gitignore
-├── pyproject.toml
+├── experiments/
+│   └── source_discovery/         # Exploratory source assessment and discovery artifacts
+│
+├── gdelt/                        # GDELT-specific implementation and supporting resources
+│
+├── logs/                         # Execution and processing logs
+│
+├── queries/
+│   └── gdelt/                    # Versioned queries used for GDELT acquisition
+│
+├── scripts/                      # Operational and execution scripts
+│
+├── src/                          # Core ETL implementation
+│
+├── tests/                        # Unit and integration tests
+│
 ├── LICENSE
 └── README.md
 ```
+### `config/`
 
+Contains general configuration required by the ETL processes, including source-specific settings and execution parameters.
+
+### `docs/`
+
+Contains technical documentation related to the architecture, MongoDB document model, data structures, and processing decisions.
+
+### `experiments/source_discovery/`
+
+Contains exploratory and experimental artifacts used during the identification, assessment, and comparison of potential data sources.
+
+Content stored in this directory is not considered production configuration and should not be consumed directly by the operational ETL pipeline until the corresponding source has been reviewed and approved.
+
+### `gdelt/`
+
+Contains implementation components and supporting resources specifically related to data acquisition through GDELT.
+
+### `logs/`
+
+Stores execution logs generated during acquisition, transformation, validation, and testing processes.
+
+### `queries/gdelt/`
+
+Contains the versioned search queries used for GDELT data acquisition, enabling traceability and reproducibility of the retrieved datasets.
+
+### `scripts/`
+
+Contains executable scripts used to run acquisition, processing, validation, maintenance, or other operational workflows.
+
+### `src/`
+
+Contains the main application code for the ETL component, including source collectors, processing logic, validation, persistence, and reusable services.
+
+### `tests/`
+
+Contains unit and integration tests used to validate source connectors, processing logic, persistence, and other ETL components.
+```
 ---
 
-## Relación con DRAGONS Data Analytics
+## Relationship with DRAGONS Data Analytics
 
-La arquitectura general entre ambos componentes es:
+The overall architecture between both components is:
 
 ```text
-Fuentes en línea
+Online sources
       │
       ▼
 dragons-data-etl
@@ -177,21 +220,21 @@ dragons-data-etl
 dragons-data-analytics
 ```
 
-`dragons-data-etl` es responsable de la adquisición, transformación, validación y almacenamiento.
+`dragons-data-etl` is responsible for data acquisition, transformation, validation, quality control, and storage.
 
-`dragons-data-analytics` consume estos datos para construir la vista minable y desarrollar los análisis posteriores.
-
----
-
-## Licencia
-
-Este proyecto se distribuye bajo la **Apache License 2.0**.
-
-La licencia aplica al código fuente del repositorio. Los datos recolectados estarán sujetos a las condiciones de uso, licenciamiento y acceso definidas por cada fuente o proveedor.
+`dragons-data-analytics` consumes the resulting data to build the analytical dataset and mining view, and to perform subsequent statistical, NLP, AI, and data-analysis processes.
 
 ---
 
-## Contacto
+## License
+
+This project is distributed under the **Apache License 2.0**.
+
+The licence applies to the source code contained in this repository. Data collected from external sources remain subject to the access, licensing, and usage conditions established by each source or data provider.
+
+---
+
+## Contact
 
 **Technical & Data Analytics Lead**
 **PhD Luis Gabriel Moreno Sandoval**
