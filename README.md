@@ -200,7 +200,6 @@ Contains the main application code for the ETL component, including source colle
 ### `tests/`
 
 Contains unit and integration tests used to validate source connectors, processing logic, persistence, and other ETL components.
-```
 ---
 
 ## Relationship with DRAGONS Data Analytics
@@ -237,6 +236,9 @@ The licence applies to the source code contained in this repository. Data collec
 ## Contact
 
 **Technical & Data Analytics Lead**
+
 **PhD Luis Gabriel Moreno Sandoval**
+
 Pontificia Universidad Javeriana
+
 📧 [morenoluis@javeriana.edu.co](mailto:morenoluis@javeriana.edu.co)
