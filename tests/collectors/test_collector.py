@@ -10,8 +10,8 @@ import pytest
 
 from src.gdelt.collectors.gdelt.bigquery_client import BigQueryJobMetrics, BigQueryQueryResult
 from src.gdelt.collectors.gdelt.collector import GdeltCollector
-from src.gdelt.collectors.common.config import DatasetConfig, DateRangeConfig, GdeltSourceConfig
-from src.gdelt.collectors.common.exceptions import ResourceLimitError
+from src.gdelt.common.config import DatasetConfig, DateRangeConfig, GdeltSourceConfig
+from src.gdelt.common.exceptions import ResourceLimitError
 
 
 def make_config(**overrides) -> GdeltSourceConfig:
