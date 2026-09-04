@@ -209,13 +209,43 @@ La investigación identificó que un análisis más completo podría requerir pu
 
 Los **US$58** del plan Starter ya están incluidos en este total y no deben sumarse nuevamente.
 
-## 8. Posible descuento académico
+## 7.1. Posible descuento académico
 
 Durante la investigación se identificó que Apify contempla posibles beneficios para estudiantes e instituciones académicas. El equipo investigador sugirió consultar directamente con la empresa la disponibilidad de un descuento antes de tomar una decisión sobre una recolección masiva.
 
 Este beneficio no se incluyó en los cálculos. Por ello, el rango de **US$560–605** se mantiene como una estimación conservadora. [Programa de Apify para universidades](https://apify.com/for/universities).
 
+## 8  Herramienta principal de IA: LLM
+
+Después de la recolección y preparación de los datos obtenidos mediante Apify, GDELT y otras fuentes, se propone utilizar un modelo de lenguaje de gran escala (LLM) como herramienta principal de inteligencia artificial para el análisis del proyecto.
+
+### Modelos propuestos
+
+* **Gemini 2.5 Flash:** recomendado para procesar grandes volúmenes de información, ejecutar tareas repetitivas y mantener un menor costo de consumo.
+* **Gemini 2.5 Pro:** recomendado para análisis de mayor complejidad que requieran mejor comprensión contextual y capacidad de razonamiento.
+
+Se podrá adoptar una estrategia combinada: utilizar Gemini 2.5 Flash para el procesamiento masivo y reservar Gemini 2.5 Pro para casos complejos o que requieran una revisión más detallada.
+
+Estos modelos también tienen la capacidad de analizar los contenidos directamente en su idioma original y apoyar tareas de traducción. Será necesario verificar mediante pruebas piloto la calidad de los resultados en español, húngaro e inglés.
+
+### Protocolo técnico e investigativo
+
+Antes de iniciar el procesamiento, se deberá definir un protocolo conjunto entre el equipo de desarrollo y el equipo investigativo. Este protocolo establecerá los criterios técnicos y metodológicos para utilizar los modelos, de esta manera poder cumplir con los objetivos del proyecto y optimizar los recursos disponibles.
+
+### Estimación de costo
+
+Con base en las tareas consideradas hasta el momento, se estima un consumo del LLM de entre **US$300 y US$400**. El valor deberá validarse mediante una prueba piloto, ya que dependerá del modelo seleccionado, la cantidad y longitud de los registros, el número de ejecuciones y el tamaño de las instrucciones y respuestas.
+
+| Componente tecnológico                              |   Costo estimado |
+| --------------------------------------------------- | ---------------: |
+| Recolección de datos con Apify                      |   **US$560–605** |
+| Procesamiento con Gemini 2.5 Flash o Gemini 2.5 Pro |   **US$300–400** |
+| **Costo tecnológico total estimado**                | **US$860–1.005** |
+
+Los valores son preliminares y podrán modificarse según los resultados de la prueba piloto, el volumen definitivo de información y las tarifas vigentes.
+
+
 ## 9. Conclusión
 
-La principal recomendación es realizar primero una prueba piloto que permita comparar las opciones disponibles, revisar la calidad de los datos y estimar los costos reales antes de decidir sobre una extracción de mayor alcance.
+La principal recomendación es realizar primero una prueba piloto que permita comparar las opciones disponibles, revisar la calidad de los datos y estimar los costos reales de extracción, recolección y procesamiento del corpus.
 
