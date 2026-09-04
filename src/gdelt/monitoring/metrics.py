@@ -70,6 +70,10 @@ class MongoDBMetrics:
     documents_inserted: int = 0
     documents_failed: int = 0
     duplicates: int = 0
+    quota_reached: bool = False
+    crawled_attempted: int = 0
+    crawled_succeeded: int = 0
+    crawled_inserted: int = 0
     collection_size_bytes: int | None = None
     storage_size_bytes: int | None = None
     index_size_bytes: int | None = None
@@ -80,6 +84,10 @@ class MongoDBMetrics:
             "documents_inserted": self.documents_inserted,
             "documents_failed": self.documents_failed,
             "duplicates": self.duplicates,
+            "quota_reached": self.quota_reached,
+            "crawled_attempted": self.crawled_attempted,
+            "crawled_succeeded": self.crawled_succeeded,
+            "crawled_inserted": self.crawled_inserted,
             "collection_size_bytes": self.collection_size_bytes,
             "storage_size_bytes": self.storage_size_bytes,
             "index_size_bytes": self.index_size_bytes,

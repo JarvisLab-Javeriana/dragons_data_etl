@@ -29,11 +29,19 @@ EXECUTION_METRICS_INDEXES: list[IndexSpec] = [
     IndexSpec(keys=[("status", pymongo.ASCENDING)], name="idx_status"),
 ]
 
+CRAWLED_DATA_INDEXES: list[IndexSpec] = [
+    IndexSpec(keys=[("gkg_record_id", pymongo.ASCENDING)], unique=True, name="uniq_crawled_gkg_record_id"),
+    IndexSpec(keys=[("document_identifier", pymongo.ASCENDING)], name="idx_crawled_document_identifier"),
+    IndexSpec(keys=[("run_id", pymongo.ASCENDING)], name="idx_crawled_run_id"),
+    IndexSpec(keys=[("status", pymongo.ASCENDING)], name="idx_crawled_status"),
+]
+
 
 def ensure_indexes(
     database: Database,
     gkg_records_collection: str,
     execution_metrics_collection: str,
+    crawled_data_collection: str,
 ) -> None:
     gkg_collection = database[gkg_records_collection]
     for spec in GKG_RECORDS_INDEXES:
@@ -42,3 +50,7 @@ def ensure_indexes(
     metrics_collection = database[execution_metrics_collection]
     for spec in EXECUTION_METRICS_INDEXES:
         metrics_collection.create_index(spec.keys, unique=spec.unique, name=spec.name)
+
+    crawled_collection = database[crawled_data_collection]
+    for spec in CRAWLED_DATA_INDEXES:
+        crawled_collection.create_index(spec.keys, unique=spec.unique, name=spec.name)

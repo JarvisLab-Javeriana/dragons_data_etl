@@ -93,10 +93,13 @@ class BigQueryGdeltClient:
         page_size: int = 1000,
     ) -> BigQueryQueryResult:
 
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=prepared.parameters,
-            maximum_bytes_billed=max_bytes_billed,
-        )
+        job_config_kwargs: dict[str, Any] = {
+            "query_parameters": prepared.parameters,
+        }
+        # BigQuery rejects maximum_bytes_billed when it is serialized as null/"None".
+        if max_bytes_billed is not None:
+            job_config_kwargs["maximum_bytes_billed"] = max_bytes_billed
+        job_config = bigquery.QueryJobConfig(**job_config_kwargs)
 
         metrics = BigQueryJobMetrics()
         started = time.monotonic()

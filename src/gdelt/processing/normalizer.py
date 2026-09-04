@@ -71,19 +71,31 @@ def normalize_gkg_row(row: dict[str, Any], run_id: str, collected_at: datetime) 
     locations = _split_field(row.get("V2Locations"))
     tone = _parse_tone(row.get("V2Tone"))
 
+    # Keep a compact original payload: the large GKG text fields are already
+    # stored in parsed form above. Duplicating them in `raw` overflows the
+    # Atlas M0 512 MB quota on a 100k-row ingest.
+    parsed_raw_keys = {
+        "V2Themes",
+        "V2Persons",
+        "V2Organizations",
+        "V2Locations",
+        "V2Tone",
+    }
+    raw = {key: value for key, value in row.items() if key not in parsed_raw_keys}
+
     document = {
         "source": "gdelt",
         "source_type": "gkg",
         "gkg_record_id": gkg_record_id,
         "date": _parse_gkg_date(row.get("DATE")),
         "document_identifier": document_identifier,
-        "source_common_name": row.get("SourceCollectionIdentifier"),
+        "source_common_name": row.get("SourceCommonName") or row.get("SourceCollectionIdentifier"),
         "themes": themes,
         "persons": persons,
         "organizations": organizations,
         "locations": locations,
         "tone": tone,
-        "raw": row,
+        "raw": raw,
         "ingestion": {
             "run_id": run_id,
             "collected_at": collected_at,

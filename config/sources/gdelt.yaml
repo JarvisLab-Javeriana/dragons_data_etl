@@ -7,19 +7,27 @@ dataset:
 
 keywords:
   - biodiversity
+  - nature crisis
+  - natural world
+  - native species
+  - critically endangered
+  - mass extinction
+  - ecological crisis
+  - nature-positive
 
 date_range:
-  start: "2020-01-01"
-  end: "2020-02-01"
+  start: "2015-02-01"
+  end: "2026-07-01"  # inclusive through June 2026 (_PARTITIONTIME is exclusive of end)
 
 max_rows: 100000
 
 batch_size: 1000
 
-mode: test
+mode: ingestion
 
-save_to_mongodb: false
+save_to_mongodb: true
 
 save_metrics: true
 
-max_bytes_billed: 5000000000  # 5 GB
+# Dry-run for this keyword set + Feb 2015–Jun 2026 estimates ~21.3 TB processed.
+max_bytes_billed: 22000000000000  # 22 TB

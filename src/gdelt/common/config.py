@@ -18,7 +18,7 @@ load_dotenv(override=False)
 
 _ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _resolve_env_placeholders(value: Any) -> Any:
@@ -138,6 +138,7 @@ class MongoDBConfig:
     database: str
     gkg_records_collection: str
     execution_metrics_collection: str
+    crawled_data_collection: str
     connect_timeout_ms: int
     server_selection_timeout_ms: int
     ordered_inserts: bool
@@ -163,6 +164,7 @@ class MongoDBConfig:
             execution_metrics_collection=collections.get(
                 "execution_metrics", "execution_metrics"
             ),
+            crawled_data_collection=collections.get("crawled_data", "crawled_data"),
             connect_timeout_ms=int(raw.get("connect_timeout_ms", 5000)),
             server_selection_timeout_ms=int(
                 raw.get("server_selection_timeout_ms", 5000)
@@ -230,3 +232,35 @@ class LoggingConfig:
 
 def load_logging_config(path: str | Path = "config/settings/logging.yaml") -> LoggingConfig:
     return LoggingConfig.from_dict(load_yaml(path))
+
+
+@dataclass(frozen=True)
+class CrawlerConfig:
+    """Typed view over config/sources/crawler.yaml."""
+
+    output_dir: str
+    limit: int
+    user_agent: str
+    request_timeout_seconds: float
+    delay_seconds: float
+    respect_robots_txt: bool
+    max_html_bytes: int
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "CrawlerConfig":
+        return cls(
+            output_dir=raw.get("output_dir", "data/crawled"),
+            limit=int(raw.get("limit", 50)),
+            user_agent=raw.get(
+                "user_agent",
+                "DragonsDataETL/0.1 (research; biodiversity corpus)",
+            ),
+            request_timeout_seconds=float(raw.get("request_timeout_seconds", 20)),
+            delay_seconds=float(raw.get("delay_seconds", 1.0)),
+            respect_robots_txt=bool(raw.get("respect_robots_txt", True)),
+            max_html_bytes=int(raw.get("max_html_bytes", 5 * 1024 * 1024)),
+        )
+
+
+def load_crawler_config(path: str | Path = "config/sources/crawler.yaml") -> CrawlerConfig:
+    return CrawlerConfig.from_dict(load_yaml(path))

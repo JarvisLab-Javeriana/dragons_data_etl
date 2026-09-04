@@ -11,9 +11,10 @@ import pytest
 
 mongomock = pytest.importorskip("mongomock")
 
-from src.gedelt.collectors.common.config import MongoDBConfig  # noqa: E402
+from src.gdelt.common.config import MongoDBConfig  # noqa: E402
 from src.gdelt.database.mongodb import MongoDBConnection  # noqa: E402
 from src.gdelt.database.repositories import (  # noqa: E402
+    CrawledDataRepository,
     ExecutionMetricsRepository,
     GkgRecordsRepository,
     initialize_database,
@@ -27,6 +28,7 @@ def mongo_connection(monkeypatch):
         database="test_db",
         gkg_records_collection="gkg_records",
         execution_metrics_collection="execution_metrics",
+        crawled_data_collection="crawled_data",
         connect_timeout_ms=1000,
         server_selection_timeout_ms=1000,
         ordered_inserts=False,
@@ -72,3 +74,37 @@ def test_execution_metrics_repository_upserts_by_run_id(mongo_connection):
 
     stored = repo.get_by_run_id("run_1")
     assert stored["status"] == "success"
+
+
+def test_list_http_document_urls_filters_and_limits(mongo_connection):
+    connection, config = mongo_connection
+    repo = GkgRecordsRepository(connection, config)
+    repo.insert_batch(
+        [
+            {"gkg_record_id": "a", "document_identifier": "https://example.com/a"},
+            {"gkg_record_id": "b", "document_identifier": "not-a-url"},
+            {"gkg_record_id": "c", "document_identifier": "https://example.com/c"},
+        ]
+    )
+
+    urls = repo.list_http_document_urls(limit=1)
+
+    assert len(urls) == 1
+    assert urls[0]["document_identifier"].startswith("https://")
+
+
+def test_crawled_data_repository_inserts_documents(mongo_connection):
+    connection, config = mongo_connection
+    repo = CrawledDataRepository(connection, config)
+    result = repo.insert_batch(
+        [
+            {
+                "gkg_record_id": "a",
+                "document_identifier": "https://example.com/a",
+                "status": "success",
+                "text": "hello",
+            }
+        ]
+    )
+    assert result.inserted == 1
+    assert repo.collection.count_documents({}) == 1

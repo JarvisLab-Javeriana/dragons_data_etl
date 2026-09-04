@@ -1,0 +1,13 @@
+output_dir: data/crawled
+
+limit: 50
+
+user_agent: "DragonsDataETL/0.1 (research; biodiversity corpus)"
+
+request_timeout_seconds: 20
+
+delay_seconds: 1.0
+
+respect_robots_txt: true
+
+max_html_bytes: 5242880  # 5 MB

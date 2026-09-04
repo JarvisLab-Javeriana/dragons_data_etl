@@ -29,7 +29,8 @@ def test_normalize_gkg_row_basic_fields():
     assert "ENV_BIODIVERSITY" in document["themes"]
     assert document["tone"]["tone"] == -2.5
     assert document["run_id"] == "run_test_1"
-    assert document["raw"] == row  # non-destructive: original preserved
+    assert document["raw"]["GKGRECORDID"] == "20200101000000-1"
+    assert "V2Themes" not in document["raw"]
 
 
 def test_normalize_gkg_row_handles_missing_optional_fields():

@@ -4,9 +4,10 @@ database: "${MONGODB_DATABASE}"
 collections:
   gkg_records: gkg_records
   execution_metrics: execution_metrics
+  crawled_data: crawled_data
 
-connect_timeout_ms: 5000
-server_selection_timeout_ms: 5000
+connect_timeout_ms: 30000
+server_selection_timeout_ms: 30000
 
 ordered_inserts: false  
 

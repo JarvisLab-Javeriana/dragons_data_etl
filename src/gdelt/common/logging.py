@@ -44,5 +44,6 @@ def configure_logging(path: str = "config/settings/logging.yaml") -> None:
         logging.getLogger("google").setLevel(logging.WARNING)
         logging.getLogger("urllib3").setLevel(logging.WARNING)
         logging.getLogger("pymongo").setLevel(logging.WARNING)
+        logging.getLogger("trafilatura").setLevel(logging.WARNING)
 
     _CONFIGURED = True
