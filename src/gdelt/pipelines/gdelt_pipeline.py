@@ -10,11 +10,12 @@ from src.gdelt.common.config import (
     GdeltSourceConfig,
     MongoDBConfig,
     PipelineConfig,
+    load_crawler_config,
     load_gdelt_config,
     load_mongodb_config,
     load_pipeline_config,
 )
-from src.gdelt.common.exceptions import DragonsDataETLError, ResourceLimitError
+from src.gdelt.common.exceptions import DragonsDataETLError, MongoDBError, ResourceLimitError
 from src.gdelt.common.utils import chunked, new_run_id, utcnow
 from src.gdelt.database.mongodb import MongoDBConnection
 from src.gdelt.database.repositories import (
@@ -25,6 +26,7 @@ from src.gdelt.database.repositories import (
 from src.gdelt.monitoring import execution_logger
 from src.gdelt.monitoring.metrics import ErrorInfo, ExecutionMetrics
 from src.gdelt.monitoring.system_metrics import SystemMonitor
+from src.gdelt.pipelines.crawl_pipeline import CrawlPipeline
 from src.gdelt.processing.normalizer import normalize_gkg_row
 from src.gdelt.processing.transformers import prepare_batch_for_storage
 from src.gdelt.quality.checks import run_quality_checks
@@ -60,6 +62,7 @@ class GdeltPipeline:
             "max_rows": self.gdelt_config.max_rows,
             "batch_size": self.gdelt_config.batch_size,
             "mode": self.gdelt_config.mode,
+            "crawler_limit": load_crawler_config().limit,
         }
 
         monitor = SystemMonitor(
@@ -171,6 +174,9 @@ class GdeltPipeline:
     ) -> None:
         collected_at = utcnow()
         processing_start = time.monotonic()
+        pending_targets: list[dict[str, Any]] = []
+        crawled_done = False
+        crawl_limit = load_crawler_config().limit if self.gdelt_config.is_ingestion else 0
 
         for batch_number, raw_batch in enumerate(
             chunked(rows, self.gdelt_config.batch_size), start=1
@@ -203,6 +209,25 @@ class GdeltPipeline:
                 metrics.mongodb.documents_failed += insert_result.failed
                 metrics.mongodb.duplicates += insert_result.duplicate_key_errors
                 metrics.processing.rows_inserted += insert_result.inserted
+                if insert_result.inserted:
+                    pending_targets.extend(
+                        _http_targets_from_documents(dedupe_result.unique_documents)
+                    )
+                if (
+                    not crawled_done
+                    and crawl_limit > 0
+                    and len(pending_targets) >= crawl_limit
+                ):
+                    self._crawl_sample(pending_targets, run_id, metrics, crawl_limit)
+                    crawled_done = True
+                if insert_result.quota_exceeded:
+                    metrics.mongodb.quota_reached = True
+                    logger.warning(
+                        "MongoDB quota reached after inserting %s gkg_records; "
+                        "stopping further GKG inserts.",
+                        metrics.mongodb.documents_inserted,
+                    )
+                    break
 
             metrics.processing.batches_processed = batch_number
             metrics.processing.batch_size = self.gdelt_config.batch_size
@@ -215,6 +240,9 @@ class GdeltPipeline:
                 quality_result.invalid_count,
                 dedupe_result.duplicate_count,
             )
+
+        if not crawled_done and pending_targets and crawl_limit > 0:
+            self._crawl_sample(pending_targets, run_id, metrics, crawl_limit)
 
         metrics.processing.processing_duration_seconds = time.monotonic() - processing_start
 
@@ -234,13 +262,40 @@ class GdeltPipeline:
         except DragonsDataETLError as exc:
             logger.warning("Could not collect MongoDB server stats: %s", exc)
 
+    def _crawl_sample(
+        self,
+        targets: list[dict[str, Any]],
+        run_id: str,
+        metrics: ExecutionMetrics,
+        crawl_limit: int,
+    ) -> None:
+        logger.info("Starting automated crawl of %s URLs into crawled_data", crawl_limit)
+        try:
+            summary = CrawlPipeline().run(
+                limit=crawl_limit,
+                targets=targets,
+                run_id=run_id,
+            )
+        except Exception:
+            logger.exception("Automated crawl failed; continuing GKG ingest")
+            return
+        metrics.mongodb.crawled_attempted = int(summary.get("attempted") or 0)
+        metrics.mongodb.crawled_succeeded = int(summary.get("succeeded") or 0)
+        metrics.mongodb.crawled_inserted = int(summary.get("inserted") or 0)
+        if summary.get("quota_exceeded"):
+            metrics.mongodb.quota_reached = True
+
     def _persist_metrics(
         self, metrics: ExecutionMetrics, repository: ExecutionMetricsRepository | None
     ) -> None:
         if not self.gdelt_config.save_metrics:
             execution_logger.log_summary(metrics)
             return
-        execution_logger.persist(metrics, repository)
+        try:
+            execution_logger.persist(metrics, repository)
+        except MongoDBError as exc:
+            logger.warning("Could not persist execution metrics: %s", exc)
+            execution_logger.log_summary(metrics)
 
     def _close_all(
         self, connection: MongoDBConnection | None, collector: GdeltCollector | None
@@ -249,3 +304,24 @@ class GdeltPipeline:
             collector.close()
         if connection is not None:
             connection.close()
+
+
+def _http_targets_from_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    targets: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for document in documents:
+        url = str(document.get("document_identifier") or "").strip()
+        if not url.lower().startswith(("http://", "https://")):
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        targets.append(
+            {
+                "gkg_record_id": document.get("gkg_record_id"),
+                "document_identifier": url,
+                "date": document.get("date"),
+                "source_common_name": document.get("source_common_name"),
+            }
+        )
+    return targets
