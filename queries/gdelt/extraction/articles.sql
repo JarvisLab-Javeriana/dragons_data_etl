@@ -2,29 +2,18 @@ SELECT
   GKGRECORDID,
   DATE,
   SourceCollectionIdentifier,
+  SourceCommonName,
   DocumentIdentifier,
-  V1Counts,
-  V2Counts,
-  V1Themes,
   V2Themes,
-  V1Locations,
   V2Locations,
-  V1Persons,
   V2Persons,
-  V1Organizations,
   V2Organizations,
-  V1Tone,
-  V2Tone,
-  GCAM,
-  AllNames,
-  Amounts,
-  TranslationInfo,
-  Extras
+  V2Tone
 FROM
   `{project}.{dataset}.{table}`
 WHERE
-  _PARTITIONTIME >= @start_date
-  AND _PARTITIONTIME < @end_date
+  _PARTITIONTIME >= TIMESTAMP(@start_date)
+  AND _PARTITIONTIME < TIMESTAMP(@end_date)
   AND EXISTS (
     SELECT 1
     FROM UNNEST(@keywords) AS kw

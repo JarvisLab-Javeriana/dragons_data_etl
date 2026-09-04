@@ -3,8 +3,8 @@ SELECT
 FROM
   `{project}.{dataset}.{table}`
 WHERE
-  _PARTITIONTIME >= @start_date
-  AND _PARTITIONTIME < @end_date
+  _PARTITIONTIME >= TIMESTAMP(@start_date)
+  AND _PARTITIONTIME < TIMESTAMP(@end_date)
   AND EXISTS (
     SELECT 1
     FROM UNNEST(@keywords) AS kw
