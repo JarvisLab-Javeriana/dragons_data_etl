@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+import certifi
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.errors import PyMongoError
@@ -24,11 +25,19 @@ class MongoDBConnection:
     def client(self) -> MongoClient:
         if self._client is None:
             try:
-                self._client = MongoClient(
-                    self.config.uri,
-                    connectTimeoutMS=self.config.connect_timeout_ms,
-                    serverSelectionTimeoutMS=self.config.server_selection_timeout_ms,
-                )
+                client_kwargs: dict = {
+                    "connectTimeoutMS": self.config.connect_timeout_ms,
+                    "serverSelectionTimeoutMS": self.config.server_selection_timeout_ms,
+                }
+                # Atlas (mongodb+srv) needs an explicit CA bundle on some
+                # Windows/OpenSSL combinations; local mongodb:// stays as-is.
+                if self.config.uri.startswith("mongodb+srv://"):
+                    client_kwargs["tls"] = True
+                    client_kwargs["tlsCAFile"] = certifi.where()
+                    # Avoid OCSP stapling failures that surface as TLS alerts
+                    # on some Windows/OpenSSL 3.x + Atlas combinations.
+                    client_kwargs["tlsDisableOCSPEndpointCheck"] = True
+                self._client = MongoClient(self.config.uri, **client_kwargs)
                 # Force a round-trip so connection errors surface early
                 # instead of on the first real query.
                 self._client.admin.command("ping")

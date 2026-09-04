@@ -15,12 +15,23 @@ from src.gdelt.database.mongodb import MongoDBConnection
 logger = logging.getLogger(__name__)
 
 
+def is_mongodb_quota_error(exc: BaseException) -> bool:
+    code = getattr(exc, "code", None)
+    if code == 8000:
+        return True
+    details = getattr(exc, "details", None) or {}
+    if details.get("code") == 8000:
+        return True
+    return "space quota" in str(exc).lower()
+
+
 @dataclass
 class InsertBatchResult:
     attempted: int = 0
     inserted: int = 0
     failed: int = 0
     duplicate_key_errors: int = 0
+    quota_exceeded: bool = False
     errors: list[str] = field(default_factory=list)
 
 
@@ -60,6 +71,14 @@ class GkgRecordsRepository(BaseRepository):
             result.inserted = len(insert_result.inserted_ids)
             result.failed = result.attempted - result.inserted
         except BulkWriteError as exc:
+            if is_mongodb_quota_error(exc):
+                result.quota_exceeded = True
+                n_inserted = exc.details.get("nInserted", 0)
+                result.inserted = int(n_inserted)
+                result.failed = result.attempted - result.inserted
+                result.errors.append(str(exc))
+                logger.warning("MongoDB quota reached while inserting gkg_records: %s", exc)
+                return result
             write_errors = exc.details.get("writeErrors", [])
             result.failed = len(write_errors)
             result.inserted = result.attempted - result.failed
@@ -77,12 +96,89 @@ class GkgRecordsRepository(BaseRepository):
                 result.attempted,
             )
         except PyMongoError as exc:
+            if is_mongodb_quota_error(exc):
+                result.quota_exceeded = True
+                result.failed = result.attempted - result.inserted
+                result.errors.append(str(exc))
+                logger.warning("MongoDB quota reached while inserting gkg_records: %s", exc)
+                return result
             raise MongoDBError(f"Failed to insert batch into gkg_records: {exc}") from exc
 
         return result
 
     def count_by_run(self, run_id: str) -> int:
         return self.collection.count_documents({"run_id": run_id})
+
+    def list_http_document_urls(self, limit: int) -> list[dict[str, Any]]:
+        """Return GKG records whose document_identifier looks like an HTTP(S) URL."""
+        try:
+            cursor = (
+                self.collection.find(
+                    {"document_identifier": {"$regex": r"^https?://", "$options": "i"}},
+                    {
+                        "gkg_record_id": 1,
+                        "document_identifier": 1,
+                        "date": 1,
+                        "source_common_name": 1,
+                    },
+                )
+                .limit(limit)
+            )
+            documents = []
+            for doc in cursor:
+                documents.append(
+                    {
+                        "gkg_record_id": doc.get("gkg_record_id"),
+                        "document_identifier": doc.get("document_identifier"),
+                        "date": doc.get("date"),
+                        "source_common_name": doc.get("source_common_name"),
+                    }
+                )
+            return documents
+        except PyMongoError as exc:
+            raise MongoDBError(f"Failed to list document URLs: {exc}") from exc
+
+
+class CrawledDataRepository(BaseRepository):
+    """Persistence for crawled article text and metadata."""
+
+    def __init__(self, connection: MongoDBConnection, config: MongoDBConfig) -> None:
+        super().__init__(connection, config.crawled_data_collection)
+        self._ordered = config.ordered_inserts
+
+    def insert_batch(self, documents: list[dict[str, Any]]) -> InsertBatchResult:
+        result = InsertBatchResult(attempted=len(documents))
+        if not documents:
+            return result
+        try:
+            insert_result = self.collection.insert_many(
+                documents, ordered=self._ordered
+            )
+            result.inserted = len(insert_result.inserted_ids)
+            result.failed = result.attempted - result.inserted
+        except BulkWriteError as exc:
+            if is_mongodb_quota_error(exc):
+                result.quota_exceeded = True
+                result.inserted = int(exc.details.get("nInserted", 0))
+                result.failed = result.attempted - result.inserted
+                result.errors.append(str(exc))
+                return result
+            write_errors = exc.details.get("writeErrors", [])
+            result.failed = len(write_errors)
+            result.inserted = result.attempted - result.failed
+            for err in write_errors:
+                if err.get("code") == 11000:
+                    result.duplicate_key_errors += 1
+                else:
+                    result.errors.append(err.get("errmsg", "unknown error"))
+        except PyMongoError as exc:
+            if is_mongodb_quota_error(exc):
+                result.quota_exceeded = True
+                result.failed = result.attempted - result.inserted
+                result.errors.append(str(exc))
+                return result
+            raise MongoDBError(f"Failed to insert batch into crawled_data: {exc}") from exc
+        return result
 
 
 class ExecutionMetricsRepository(BaseRepository):
@@ -112,4 +208,5 @@ def initialize_database(connection: MongoDBConnection, config: MongoDBConfig) ->
             connection.database,
             config.gkg_records_collection,
             config.execution_metrics_collection,
+            config.crawled_data_collection,
         )
