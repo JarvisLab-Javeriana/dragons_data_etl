@@ -24,6 +24,7 @@ def _args(**overrides) -> Namespace:
         end_date="2026-01-31",
         limit=10,
         output="results.json",
+        credentials=None,
     )
     base.update(overrides)
     return Namespace(**base)
@@ -82,8 +83,8 @@ def test_run_writes_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         client,
         "fetch_records",
-        lambda query: [
-            {"url": "https://example.com/a", "title": "Hello", "language": "English"}
+        lambda query, credentials_path=None: [
+            {"DocumentIdentifier": "https://example.com/a", "SourceCommonName": "bbc.co.uk"}
         ],
     )
     output = tmp_path / "out.json"
@@ -96,35 +97,12 @@ def test_run_writes_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert summary["records_processed"] == 1
     assert summary["sample_urls"] == ["https://example.com/a"]
     assert summary["elapsed_seconds"] >= 0
+    assert summary["source"] == "bigquery"
 
 
-def test_build_gdelt_query_text_includes_languages_and_media():
-    text = client.build_gdelt_query_text(
-        {
-            "keywords": ["biodiversity", "conservation"],
-            "tags": ["environment"],
-            "languages": ["en", "es", "hu"],
-            "media": ["bbc", "reuters"],
-        }
-    )
-    assert "biodiversity OR conservation" in text
-    assert "sourcelang:english" in text
-    assert "sourcelang:spanish" in text
-    assert "sourcelang:hungarian" in text
-    assert "domain:bbc.com" in text
-    assert "domain:reuters.com" in text
-    assert "environment" in text
-
-
-def test_filter_by_language_keeps_selected_codes():
-    articles = [
-        {"url": "1", "language": "English"},
-        {"url": "2", "language": "French"},
-        {"url": "3", "language": "Spanish"},
-        {"url": "4", "language": "Hungarian"},
-    ]
-    kept = client.filter_by_language(articles, ["en", "hu"])
-    assert [row["url"] for row in kept] == ["1", "4"]
+def test_media_domains_expands_aliases():
+    assert "bbc.com" in client.media_domains(["bbc", "reuters"])
+    assert "reuters.com" in client.media_domains(["bbc", "reuters"])
 
 
 def test_parse_args_default_limit_and_languages():

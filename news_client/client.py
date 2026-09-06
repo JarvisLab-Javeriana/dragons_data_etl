@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Cliente CLI para consultar noticias en GDELT (API pública DOC 2.0).
+"""Cliente CLI para consultar GDELT en BigQuery (cuenta de servicio Google).
 
-Tras clonar el repositorio basta con Python 3.10+ e internet: no hay YAML,
-claves ni paquetes extra. Los socios cambian la búsqueda con argumentos.
+No usa la API pública de GDELT (evita HTTP 429). Requiere el JSON de una
+cuenta de servicio con acceso a BigQuery, o GOOGLE_APPLICATION_CREDENTIALS.
 """
 
 from __future__ import annotations
@@ -10,22 +10,18 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from dataclasses import asdict, dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 SUPPORTED_LANGUAGES = ("en", "es", "hu")
-LANGUAGE_TO_GDELT = {
-    "en": "english",
-    "es": "spanish",
-    "hu": "hungarian",
-}
 MEDIA_DOMAINS = {
     "bbc": ("bbc.com", "bbc.co.uk"),
     "reuters": ("reuters.com",),
@@ -37,8 +33,9 @@ MEDIA_DOMAINS = {
 }
 DEFAULT_LIMIT = 100
 DEFAULT_OUTPUT = "results.json"
-GDELT_DOC_API = "https://api.gdeltproject.org/api/v2/doc/doc"
-GDELT_MAX_RECORDS = 250
+GDELT_PROJECT = "gdelt-bq"
+GDELT_DATASET = "gdeltv2"
+GDELT_TABLE = "gkg_partitioned"
 
 logger = logging.getLogger("client")
 
@@ -91,22 +88,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="client.py",
         description=(
-            "Consulta la API pública de GDELT y descarga artículos. "
-            "Cambie keywords, tags, idiomas, medios, fechas y --limit en el "
-            "comando; no edite el código ni configure credenciales."
+            "Consulta GDELT en BigQuery y descarga artículos. "
+            "Pase el JSON de la cuenta de servicio con --credentials "
+            "(o defina GOOGLE_APPLICATION_CREDENTIALS). "
+            "No usa la API pública de GDELT."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Idiomas permitidos: en, es, hu (se envían a GDELT como "
-            "sourcelang:english/spanish/hungarian).\n"
-            f"--limit por defecto: {DEFAULT_LIMIT} (máximo de la API: {GDELT_MAX_RECORDS}).\n"
+            "Idiomas: en, es, hu (filtro GKG TranslationInfo).\n"
             "En PowerShell escriba el comando en una sola línea.\n\n"
             "Ejemplos:\n"
-            "  python client.py --keywords biodiversity --start-date 2026-01-01 "
-            "--end-date 2026-01-31 --limit 10\n"
+            "  python client.py --credentials C:\\ruta\\cuenta.json "
+            "--keywords biodiversity --start-date 2024-01-01 "
+            "--end-date 2024-01-31 --limit 10\n"
             "  python client.py --keywords \"biodiversity,conservation\" "
             "--tags environment --languages \"en,es\" --media \"bbc,reuters\" "
-            "--start-date 2026-01-01 --end-date 2026-01-31 --limit 100"
+            "--start-date 2024-01-01 --end-date 2024-01-31 --limit 100"
         ),
     )
     parser.add_argument(
@@ -124,7 +121,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=",".join(SUPPORTED_LANGUAGES),
         help=(
             "Idiomas (en, es, hu). Uno, varios o los tres. "
-            "Se aplican en la consulta GDELT. "
             f"Por defecto: {','.join(SUPPORTED_LANGUAGES)}."
         ),
     )
@@ -149,12 +145,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--limit",
         type=positive_int,
         default=DEFAULT_LIMIT,
-        help=f"Máximo de registros a obtener (hasta {GDELT_MAX_RECORDS}). Por defecto: {DEFAULT_LIMIT}.",
+        help=f"Máximo de registros a obtener. Por defecto: {DEFAULT_LIMIT}.",
     )
     parser.add_argument(
         "--output",
         default=DEFAULT_OUTPUT,
         help=f"Archivo JSON de salida. Por defecto: {DEFAULT_OUTPUT}.",
+    )
+    parser.add_argument(
+        "--credentials",
+        default=None,
+        help=(
+            "Ruta al JSON de cuenta de servicio de Google Cloud. "
+            "Si se omite, se usa GOOGLE_APPLICATION_CREDENTIALS."
+        ),
     )
     return parser.parse_args(argv)
 
@@ -210,19 +214,6 @@ def build_query(params: QueryParams) -> dict[str, Any]:
     }
 
 
-def _quote_term(term: str) -> str:
-    cleaned = term.strip()
-    if " " in cleaned:
-        return f'"{cleaned}"'
-    return cleaned
-
-
-def _or_group(terms: list[str]) -> str:
-    if len(terms) == 1:
-        return terms[0]
-    return "(" + " OR ".join(terms) + ")"
-
-
 def media_domains(media: list[str]) -> list[str]:
     domains: list[str] = []
     seen: set[str] = set()
@@ -239,40 +230,27 @@ def media_domains(media: list[str]) -> list[str]:
     return domains
 
 
-def build_gdelt_query_text(query: dict[str, Any]) -> str:
-    """Arma el parámetro query de GDELT DOC, incluyendo sourcelang."""
-    parts: list[str] = [_or_group([_quote_term(k) for k in query["keywords"]])]
-    tags = query.get("tags") or []
-    if tags:
-        parts.append(_or_group([_quote_term(tag) for tag in tags]))
+def apply_credentials(credentials_path: str | None) -> None:
+    try:
+        from dotenv import load_dotenv
 
-    lang_ops = [
-        f"sourcelang:{LANGUAGE_TO_GDELT[code]}"
-        for code in query.get("languages") or []
-        if code in LANGUAGE_TO_GDELT
-    ]
-    if lang_ops:
-        parts.append(_or_group(lang_ops))
+        load_dotenv(REPO_ROOT / ".env", override=False)
+    except ImportError:
+        pass
 
-    domain_ops = [f"domain:{domain}" for domain in media_domains(query.get("media") or [])]
-    if domain_ops:
-        parts.append(_or_group(domain_ops))
-
-    return " ".join(parts)
-
-
-def filter_by_language(
-    articles: list[dict[str, Any]], languages: list[str]
-) -> list[dict[str, Any]]:
-    allowed = {LANGUAGE_TO_GDELT[code] for code in languages if code in LANGUAGE_TO_GDELT}
-    if not allowed:
-        return articles
-    kept: list[dict[str, Any]] = []
-    for article in articles:
-        raw = str(article.get("language") or "").strip().lower()
-        if raw in allowed:
-            kept.append(article)
-    return kept
+    path = credentials_path or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+    path = str(path).strip().strip('"')
+    if not path:
+        raise RuntimeError(
+            "Falta la cuenta de servicio de Google. Pase --credentials "
+            "con la ruta del JSON, o defina GOOGLE_APPLICATION_CREDENTIALS. "
+            "No suba ese archivo al repositorio; envíelo a su compañero por un canal privado."
+        )
+    creds = Path(path).expanduser()
+    if not creds.is_file():
+        raise RuntimeError(f"No se encontró el JSON de credenciales: {creds}")
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds.resolve())
+    logger.info("Usando credenciales BigQuery: %s", creds.resolve())
 
 
 def _jsonable(value: Any) -> Any:
@@ -283,98 +261,60 @@ def _jsonable(value: Any) -> Any:
     return str(value)
 
 
-def fetch_records(query: dict[str, Any]) -> list[dict[str, Any]]:
-    """Consulta la API pública DOC 2.0 de GDELT (sin API key)."""
-    gdelt_query = build_gdelt_query_text(query)
-    maxrecords = min(int(query["limit"]), GDELT_MAX_RECORDS)
-    if int(query["limit"]) > GDELT_MAX_RECORDS:
-        logger.info(
-            "GDELT DOC permite como máximo %s registros por llamada; se usará --limit %s.",
-            GDELT_MAX_RECORDS,
-            GDELT_MAX_RECORDS,
-        )
+def fetch_records(query: dict[str, Any], credentials_path: str | None = None) -> list[dict[str, Any]]:
+    """Consulta GDELT GKG en BigQuery. No llama a api.gdeltproject.org."""
+    apply_credentials(credentials_path)
 
-    start = date.fromisoformat(query["start_date"]).strftime("%Y%m%d000000")
-    end = date.fromisoformat(query["end_date"]).strftime("%Y%m%d235959")
-    params = {
-        "query": gdelt_query,
-        "mode": "ArtList",
-        "format": "json",
-        "maxrecords": str(maxrecords),
-        "sort": "DateDesc",
-        "startdatetime": start,
-        "enddatetime": end,
-    }
-    url = f"{GDELT_DOC_API}?{urllib.parse.urlencode(params)}"
-    logger.info("Ejecutando consulta GDELT: %s", gdelt_query)
-    logger.info("Idiomas aplicados: %s", ", ".join(query.get("languages") or []))
+    from src.gdelt.collectors.gdelt.bigquery_client import BigQueryGdeltClient
+    from src.gdelt.collectors.gdelt.query_builder import build_client_articles_query
+    from src.gdelt.common.config import DatasetConfig
+    from src.gdelt.common.exceptions import BigQueryError
 
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "dragons-data-etl-client/1.0"},
+    start_date = date.fromisoformat(query["start_date"])
+    end_exclusive = date.fromisoformat(query["end_date"]) + timedelta(days=1)
+    dataset = DatasetConfig(project=GDELT_PROJECT, dataset=GDELT_DATASET, table=GDELT_TABLE)
+    prepared = build_client_articles_query(
+        dataset,
+        start_date=start_date,
+        end_date=end_exclusive,
+        keywords=query["keywords"],
+        row_limit=int(query["limit"]),
+        tags=query.get("tags") or [],
+        media=media_domains(query.get("media") or []),
+        languages=query.get("languages") or [],
     )
-    last_error: Exception | None = None
-    raw = ""
-    for attempt in range(1, 4):
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                raw = response.read().decode("utf-8", errors="replace")
-            last_error = None
-            break
-        except urllib.error.HTTPError as exc:
-            last_error = exc
-            if exc.code == 429 and attempt < 3:
-                wait = 8 * attempt
-                logger.info(
-                    "GDELT pidió esperar (HTTP 429). Reintento %s/3 en %s s.",
-                    attempt + 1,
-                    wait,
-                )
-                time.sleep(wait)
-                continue
-            break
-        except urllib.error.URLError as exc:
-            last_error = exc
-            break
-
-    if last_error is not None:
-        hint = ""
-        if isinstance(last_error, urllib.error.HTTPError) and last_error.code == 429:
-            hint = " La API pública limita peticiones seguidas; espere un minuto y vuelva a intentar."
-        raise RuntimeError(
-            "No se pudo contactar la API pública de GDELT. Compruebe la conexión a internet."
-            f"{hint} Detalle: {last_error}"
-        ) from last_error
-
-    try:
-        payload = json.loads(raw) if raw.strip() else {}
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            "GDELT no devolvió JSON válido. Intente de nuevo en unos segundos o estreche fechas/filtros."
-        ) from exc
-
-    articles = payload.get("articles") if isinstance(payload, dict) else None
-    if not isinstance(articles, list):
-        articles = []
-
-    filtered = filter_by_language(articles, query.get("languages") or [])
     logger.info(
-        "Artículos de GDELT: %s; tras filtro de idioma: %s",
-        len(articles),
-        len(filtered),
+        "Consultando BigQuery GDELT (idiomas=%s, limit=%s)",
+        ",".join(query.get("languages") or []),
+        query["limit"],
     )
-    return filtered
+
+    client = BigQueryGdeltClient()
+    try:
+        result = client.run_query(prepared, page_size=min(int(query["limit"]), 1000))
+        rows = [dict(row) for row in result.rows]
+    except (BigQueryError, OSError, RuntimeError) as exc:
+        raise RuntimeError(
+            "No se pudo consultar GDELT en BigQuery. Verifique el JSON de la cuenta "
+            "de servicio y que BigQuery esté habilitado en ese proyecto. "
+            f"Detalle: {exc}"
+        ) from exc
+    finally:
+        client.close()
+
+    logger.info("Registros devueltos por BigQuery: %s", len(rows))
+    return rows
 
 
 def apply_limit(records: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
-    return records[: min(limit, GDELT_MAX_RECORDS)]
+    return records[:limit]
 
 
 def export_results(path: Path, query: dict[str, Any], records: list[dict[str, Any]]) -> None:
     payload = {
         "exported_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "source": "bigquery",
         "query": query,
-        "gdelt_query": build_gdelt_query_text(query),
         "record_count": len(records),
         "records": records,
     }
@@ -393,21 +333,25 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     logger.info("Parámetros utilizados: %s", json.dumps(asdict(params), ensure_ascii=False, default=str))
     logger.info("Consulta construida: %s", json.dumps(query, ensure_ascii=False))
 
-    obtained = fetch_records(query)
+    obtained = fetch_records(query, credentials_path=getattr(args, "credentials", None))
     processed = apply_limit(obtained, params.limit)
 
     output_path = Path(args.output)
     export_results(output_path, query, processed)
 
     elapsed = datetime.now().timestamp() - started
-    sample_urls = [row.get("url") for row in processed[:5] if row.get("url")]
+    sample_urls = [
+        row.get("DocumentIdentifier") or row.get("url")
+        for row in processed[:5]
+        if row.get("DocumentIdentifier") or row.get("url")
+    ]
     summary = {
         "records_obtained": len(obtained),
         "records_processed": len(processed),
         "output": str(output_path.resolve()),
         "elapsed_seconds": round(elapsed, 3),
         "sample_urls": sample_urls,
-        "gdelt_query": build_gdelt_query_text(query),
+        "source": "bigquery",
     }
     logger.info("Registros obtenidos: %s", summary["records_obtained"])
     logger.info("Registros procesados/descargados: %s", summary["records_processed"])

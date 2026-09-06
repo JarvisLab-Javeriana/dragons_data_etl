@@ -34,6 +34,31 @@ def test_build_articles_query_has_expected_parameters():
     assert "LIMIT" in prepared.sql
 
 
+def test_build_client_articles_query_includes_filters():
+    prepared = query_builder.build_client_articles_query(
+        DATASET,
+        start_date=date(2020, 1, 1),
+        end_date=date(2020, 2, 1),
+        keywords=["biodiversity"],
+        row_limit=10,
+        tags=["environment"],
+        media=["bbc.com"],
+        languages=["en", "es"],
+    )
+    param_names = {p.name for p in prepared.parameters}
+    assert param_names == {
+        "start_date",
+        "end_date",
+        "keywords",
+        "tags",
+        "media",
+        "languages",
+        "row_limit",
+    }
+    assert "TranslationInfo" in prepared.sql
+    assert "srclc:spa" in prepared.sql
+
+
 def test_build_columns_query_uses_scalar_table_name_parameter():
     prepared = query_builder.build_columns_query(DATASET, table_name="gkg_partitioned")
     assert len(prepared.parameters) == 1
