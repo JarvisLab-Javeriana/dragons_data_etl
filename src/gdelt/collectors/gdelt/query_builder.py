@@ -89,3 +89,28 @@ def build_articles_query(
         bigquery.ScalarQueryParameter("row_limit", "INT64", row_limit),
     ]
     return PreparedQuery(sql=sql, parameters=parameters, description="GKG article extraction")
+
+
+def build_client_articles_query(
+    dataset: DatasetConfig,
+    start_date: date,
+    end_date: date,
+    keywords: list[str],
+    row_limit: int,
+    tags: list[str] | None = None,
+    media: list[str] | None = None,
+    languages: list[str] | None = None,
+) -> PreparedQuery:
+    sql = _interpolate_identifiers(_read_sql("extraction/articles_client.sql"), dataset)
+    parameters = [
+        bigquery.ScalarQueryParameter("start_date", "DATE", start_date),
+        bigquery.ScalarQueryParameter("end_date", "DATE", end_date),
+        bigquery.ArrayQueryParameter("keywords", "STRING", keywords),
+        bigquery.ArrayQueryParameter("tags", "STRING", tags or []),
+        bigquery.ArrayQueryParameter("media", "STRING", media or []),
+        bigquery.ArrayQueryParameter("languages", "STRING", languages or []),
+        bigquery.ScalarQueryParameter("row_limit", "INT64", row_limit),
+    ]
+    return PreparedQuery(
+        sql=sql, parameters=parameters, description="GKG article extraction for news_client"
+    )

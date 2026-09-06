@@ -1,27 +1,26 @@
-# Cliente de consultas (GDELT)
+# Cliente de consultas (GDELT / BigQuery)
 
-CLI para buscar noticias con palabras clave, etiquetas, idiomas (`en`, `es`, `hu`), medios, fechas y `--limit`. Usa la API pública de GDELT: Python 3.10+ e internet, sin instalar paquetes ni configurar claves.
+CLI para buscar noticias con palabras clave, etiquetas, idiomas (`en`, `es`, `hu`), medios, fechas y `--limit`.
 
-## Cómo ejecutarlo
+Consulta **BigQuery** (`gdelt-bq.gdeltv2.gkg_partitioned`). **No usa la API pública** de GDELT, así no aparece el error HTTP 429.
 
-En PowerShell, una sola línea (no uses `\` para partir el comando).
+## Credenciales (JSON)
 
-Desde esta carpeta:
+Hace falta una cuenta de servicio de Google Cloud con BigQuery habilitado. El archivo `.json` **no se sube al git**. Páselo a su compañero por un canal privado (Drive interno, correo, etc.).
 
-```text
-python client.py --help
-```
+**Opción A — argumento**
 
 ```text
-python client.py --keywords "biodiversity,conservation" --tags "environment" --languages "en,es,hu" --media "reuters,bbc" --start-date "2026-08-01" --end-date "2026-08-31" --limit 10
+.venv\Scripts\python.exe news_client/client.py --credentials "C:\Users\vivgo\Downloads\dragons-data-etl-e4c3aa1016a0.json" --keywords "biodiversity" --start-date 2024-01-01 --end-date 2024-01-31 --limit 10
 ```
 
-Desde la raíz del repositorio:
+**Opción B — variable de entorno (PowerShell)**
 
 ```text
-python news_client/client.py --keywords "biodiversity" --start-date "2026-08-01" --end-date "2026-08-31" --limit 10
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Users\vivgo\Downloads\dragons-data-etl-e4c3aa1016a0.json"
+.venv\Scripts\python.exe news_client/client.py --keywords "biodiversity,conservation" --tags "environment" --languages "en,es,hu" --media "reuters,bbc" --start-date "2024-01-01" --end-date "2024-01-31" --limit 100
 ```
 
-Los resultados se guardan en `results.json` (cámbielo con `--output`). `--limit` por defecto es 100 (máximo 250).
+Use el Python del `.venv` del repo (incluye `google-cloud-bigquery`). En PowerShell el comando va en **una sola línea**.
 
-Prueba rápida: `--limit 10`. Solo español: `--languages es`.
+Los resultados quedan en `results.json`. `--languages` se aplica en SQL (inglés = sin traducción o `srclc:eng`; español `srclc:spa`; húngaro `srclc:hun`).
