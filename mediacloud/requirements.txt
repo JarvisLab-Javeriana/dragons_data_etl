@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+trafilatura
+playwright
+pymongo
+python-dotenv
+certifi
