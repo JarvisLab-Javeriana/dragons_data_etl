@@ -15,17 +15,39 @@ from pymongo.errors import PyMongoError
 
 
 DEFAULT_FIELDS = [
-    "eid",
-    "indexed_date",
-    "media_name",
-    "media_url",
-    "publish_date",
-    "title",
     "url",
+    "title",
     "language",
     "keywords",
+    "publish_date",
+    "media_name",
     "contenido",
+    "eid",
+    "hash",
+    "indexed_date",
+    "media_url",
 ]
+
+FIELD_MENU_ORDER = [
+    "url",
+    "title",
+    "language",
+    "keywords",
+    "publish_date",
+    "media_name",
+    "contenido",
+    "eid",
+    "hash",
+    "indexed_date",
+    "media_url",
+    "_id",
+]
+
+LANGUAGE_NAMES = {
+    "es": "Español",
+    "en": "Inglés",
+    "hu": "Húngaro",
+}
 
 
 
@@ -460,15 +482,7 @@ def discover_fields(
 
     ordered: list[str] = []
 
-    if "_id" in fields:
-        ordered.append(
-            "_id"
-        )
-        fields.remove(
-            "_id"
-        )
-
-    for field in DEFAULT_FIELDS:
+    for field in FIELD_MENU_ORDER:
         if field in fields:
             ordered.append(
                 field
@@ -502,6 +516,116 @@ def show_fields(
     print()
 
 
+def choose_field_by_number(
+    fields: list[str],
+    *,
+    prompt: str = "Número del campo: ",
+    allow_blank: bool = False,
+    show_menu: bool = True,
+) -> str | None:
+    if show_menu:
+        show_fields(
+            fields
+        )
+
+    while True:
+        raw = input(
+            prompt
+        ).strip()
+
+        if (
+            not raw
+            and allow_blank
+        ):
+            return None
+
+        try:
+            index = int(
+                raw
+            )
+
+        except ValueError:
+            print(
+                "Escribe el número del campo."
+            )
+            continue
+
+        if (
+            1
+            <= index
+            <= len(fields)
+        ):
+            return fields[
+                index - 1
+            ]
+
+        print(
+            "Número fuera de rango."
+        )
+
+
+def choose_fields_by_numbers(
+    fields: list[str],
+) -> list[str] | None:
+    show_fields(
+        fields
+    )
+
+    raw = input(
+        "Números separados por coma "
+        "(ej: 1,2,4): "
+    ).strip()
+
+    if not raw:
+        return None
+
+    selected: list[str] = []
+
+    for part in raw.split(","):
+        part = part.strip()
+
+        if not part:
+            continue
+
+        try:
+            index = int(
+                part
+            )
+
+        except ValueError:
+            print(
+                f"Ignorando '{part}': "
+                "no es un número."
+            )
+            continue
+
+        if not (
+            1
+            <= index
+            <= len(fields)
+        ):
+            print(
+                f"Ignorando '{part}': "
+                "fuera de rango."
+            )
+            continue
+
+        field = fields[
+            index - 1
+        ]
+
+        if field not in selected:
+            selected.append(
+                field
+            )
+
+    return (
+        selected
+        if selected
+        else None
+    )
+
+
 # ============================================================================
 # FIELD SELECTION / PROJECTION
 # ============================================================================
@@ -526,23 +650,9 @@ def ask_selected_fields(
     if option != "2":
         return None
 
-    show_fields(
+    return choose_fields_by_numbers(
         fields
     )
-
-    raw = input(
-        "Campos separados por coma "
-        "(ej: title,language,keywords,url): "
-    ).strip()
-
-    if not raw:
-        return None
-
-    return [
-        field.strip()
-        for field in raw.split(",")
-        if field.strip()
-    ]
 
 
 def build_mongo_projection(
@@ -556,7 +666,7 @@ def build_mongo_projection(
         for field in selected_fields
     }
 
-    # Needed internally to translate keyword code.
+    # Needed internally to translate keyword code into client-facing terms.
     if "keywords" in selected_fields:
         projection["language"] = 1
         projection["keywords"] = 1
@@ -731,72 +841,8 @@ def build_single_filter(
     }
 
 
-def ask_filters(
-    fields: list[str],
-) -> dict[str, Any]:
-    filters: list[
-        dict[str, Any]
-    ] = []
-
-    while True:
-        show_fields(
-            fields
-        )
-
-        field = input(
-            "Campo a filtrar "
-            "(Enter para terminar): "
-        ).strip()
-
-        if not field:
-            break
-
-        if field not in fields:
-            print(
-                f"Campo '{field}' no válido."
-            )
-            continue
-
-        if field == "keywords":
-            print(
-                "\nLas letras son internas. "
-                "Para consultar keywords reales, "
-                "usa la opción 3 del menú."
-            )
-            continue
-
-        filters.append(
-            build_single_filter(
-                field
-            )
-        )
-
-        more = input(
-            "¿Agregar otro filtro? [s/N]: "
-        ).strip().lower()
-
-        if more not in {
-            "s",
-            "si",
-            "sí",
-            "y",
-            "yes",
-        }:
-            break
-
-    if not filters:
-        return {}
-
-    if len(filters) == 1:
-        return filters[0]
-
-    return {
-        "$and": filters
-    }
-
-
 # ============================================================================
-# REAL KEYWORD SEARCH
+# LANGUAGE / KEYWORDS
 # ============================================================================
 
 def choose_language() -> str:
@@ -804,27 +850,248 @@ def choose_language() -> str:
         "\nIdioma:"
     )
     print(
-        "1. Español"
+        "1. Español (es)"
     )
     print(
-        "2. Inglés"
+        "2. Inglés (en)"
     )
     print(
-        "3. Húngaro"
+        "3. Húngaro (hu)"
     )
 
-    option = input(
-        "Opción: "
+    while True:
+        option = input(
+            "Opción: "
+        ).strip()
+
+        language = {
+            "1": "es",
+            "2": "en",
+            "3": "hu",
+        }.get(
+            option
+        )
+
+        if language:
+            return language
+
+        print(
+            "Opción no válida."
+        )
+
+
+def keyword_options(
+    keyword_maps,
+    language: str,
+) -> list[
+    tuple[
+        str,
+        dict[str, Any],
+    ]
+]:
+    return list(
+        keyword_maps
+        .get(language, {})
+        .items()
+    )
+
+
+def show_keyword_options(
+    keyword_maps,
+    language: str,
+    *,
+    preview_terms: int = 4,
+) -> list[
+    tuple[
+        str,
+        dict[str, Any],
+    ]
+]:
+    options = keyword_options(
+        keyword_maps,
+        language,
+    )
+
+    language_name = (
+        LANGUAGE_NAMES.get(
+            language,
+            language,
+        )
+    )
+
+    print(
+        f"\nCategorías de keywords — "
+        f"{language_name} ({language}):"
+    )
+
+    if not options:
+        print(
+            "No hay categorías cargadas "
+            "para este idioma.\n"
+        )
+        return []
+
+    for index, (
+        code,
+        info,
+    ) in enumerate(
+        options,
+        start=1,
+    ):
+        category = str(
+            info.get(
+                "category",
+                "",
+            )
+        )
+
+        terms = [
+            str(term)
+            for term in info.get(
+                "terms",
+                [],
+            )
+        ]
+
+        preview = ", ".join(
+            terms[
+                :preview_terms
+            ]
+        )
+
+        if (
+            len(terms)
+            > preview_terms
+        ):
+            preview += ", ..."
+
+        print(
+            f"  {index}. "
+            f"{code} — {category}"
+        )
+
+        if preview:
+            print(
+                f"     Ej.: {preview}"
+            )
+
+    print()
+
+    return options
+
+
+def choose_keyword_codes(
+    keyword_maps,
+    language: str,
+    *,
+    allow_multiple: bool = True,
+) -> list[str]:
+    options = show_keyword_options(
+        keyword_maps,
+        language,
+    )
+
+    if not options:
+        return []
+
+    if allow_multiple:
+        prompt = (
+            "Número(s) de categoría "
+            "separados por coma "
+            "(ej: 1,3): "
+        )
+    else:
+        prompt = (
+            "Número de categoría: "
+        )
+
+    raw = input(
+        prompt
     ).strip()
 
-    return {
-        "1": "es",
-        "2": "en",
-        "3": "hu",
-    }.get(
-        option,
-        "es",
+    if not raw:
+        return []
+
+    selected_codes: list[str] = []
+
+    parts = (
+        raw.split(",")
+        if allow_multiple
+        else [raw]
     )
+
+    for part in parts:
+        part = part.strip()
+
+        try:
+            index = int(
+                part
+            )
+
+        except ValueError:
+            print(
+                f"Ignorando '{part}': "
+                "no es un número."
+            )
+            continue
+
+        if not (
+            1
+            <= index
+            <= len(options)
+        ):
+            print(
+                f"Ignorando '{part}': "
+                "fuera de rango."
+            )
+            continue
+
+        code = options[
+            index - 1
+        ][0]
+
+        if code not in selected_codes:
+            selected_codes.append(
+                code
+            )
+
+    if selected_codes:
+        print(
+            "\nSeleccionado: "
+            + ", ".join(
+                selected_codes
+            )
+        )
+
+        for code in selected_codes:
+            info = (
+                keyword_maps[
+                    language
+                ][
+                    code
+                ]
+            )
+
+            print(
+                f"\n{code} — "
+                f"{info.get('category', '')}"
+            )
+
+            print(
+                "Keywords: "
+                + " | ".join(
+                    str(term)
+                    for term
+                    in info.get(
+                        "terms",
+                        [],
+                    )
+                )
+            )
+
+        print()
+
+    return selected_codes
 
 
 def find_keyword_codes(
@@ -872,6 +1139,72 @@ def find_keyword_codes(
     return matches
 
 
+def print_keyword_matches(
+    keyword_maps,
+    language: str,
+    codes: list[str],
+) -> None:
+    if not codes:
+        return
+
+    print(
+        "\nCategorías encontradas:"
+    )
+
+    for code in codes:
+        info = (
+            keyword_maps
+            .get(language, {})
+            .get(code, {})
+        )
+
+        terms = [
+            str(term)
+            for term in info.get(
+                "terms",
+                [],
+            )
+        ]
+
+        preview = ", ".join(
+            terms[:5]
+        )
+
+        if len(terms) > 5:
+            preview += ", ..."
+
+        print(
+            f"- {code} — "
+            f"{info.get('category', '')}"
+        )
+
+        if preview:
+            print(
+                f"  Ej.: {preview}"
+            )
+
+    print()
+
+
+def build_keyword_query(
+    language: str,
+    codes: list[str],
+) -> dict[str, Any]:
+    mongo_keyword_codes = (
+        expand_stored_keyword_codes(
+            language,
+            codes,
+        )
+    )
+
+    return {
+        "language": language,
+        "keywords": {
+            "$in": mongo_keyword_codes
+        },
+    }
+
+
 def search_by_real_keyword(
     collection,
     keyword_maps,
@@ -879,45 +1212,67 @@ def search_by_real_keyword(
 ):
     language = choose_language()
 
-    text = input(
-        "Escribe una keyword o parte de ella: "
-    ).strip()
-
-    codes = find_keyword_codes(
-        keyword_maps,
-        language,
-        text,
+    print(
+        "\n¿Cómo quieres elegir la keyword?"
+    )
+    print(
+        "1. Ver categorías y elegir por número"
+    )
+    print(
+        "2. Buscar escribiendo una palabra"
     )
 
-    if not codes:
-        print(
-            f"\nNo encontré keywords para "
-            f"'{text}' en '{language}'.\n"
-        )
-        return []
+    mode = input(
+        "Opción: "
+    ).strip()
 
-    # `codes` are conceptual codes from the TXT.
-    # Expand them to every code that may actually exist in MongoDB.
-    mongo_keyword_codes = expand_stored_keyword_codes(
+    if mode == "2":
+        text = input(
+            "Escribe una keyword "
+            "o parte de ella: "
+        ).strip()
+
+        codes = find_keyword_codes(
+            keyword_maps,
+            language,
+            text,
+        )
+
+        if not codes:
+            print(
+                f"\nNo encontré keywords para "
+                f"'{text}' en '{language}'.\n"
+            )
+            return []
+
+        print_keyword_matches(
+            keyword_maps,
+            language,
+            codes,
+        )
+
+    else:
+        codes = choose_keyword_codes(
+            keyword_maps,
+            language,
+            allow_multiple=True,
+        )
+
+        if not codes:
+            print(
+                "\nNo seleccionaste "
+                "ninguna categoría.\n"
+            )
+            return []
+
+    query = build_keyword_query(
         language,
         codes,
     )
 
-    query = {
-        "language": language,
-        "keywords": {
-            "$in": mongo_keyword_codes
-        },
-    }
-
     print(
-        "\nCategorías conceptuales encontradas: "
+        "\nConsulta por categorías: "
         + ", ".join(codes)
-    )
-
-    print(
-        "Códigos internos consultados en MongoDB: "
-        + ", ".join(mongo_keyword_codes)
     )
 
     selected_fields = ask_selected_fields(
@@ -946,6 +1301,161 @@ def search_by_real_keyword(
         limit,
         sort_spec,
         keyword_maps,
+    )
+
+
+def ask_filters(
+    fields: list[str],
+    keyword_maps,
+) -> dict[str, Any]:
+    filters: list[
+        dict[str, Any]
+    ] = []
+
+    while True:
+        field = choose_field_by_number(
+            fields,
+            prompt=(
+                "Número del campo a filtrar "
+                "(Enter para terminar): "
+            ),
+            allow_blank=True,
+            show_menu=True,
+        )
+
+        if field is None:
+            break
+
+        # Language gets a simple numbered language menu.
+        if field == "language":
+            language = choose_language()
+
+            filters.append(
+                {
+                    "language": language
+                }
+            )
+
+        # Keywords get a language + conceptual category menu.
+        elif field == "keywords":
+            language = choose_language()
+
+            codes = choose_keyword_codes(
+                keyword_maps,
+                language,
+                allow_multiple=True,
+            )
+
+            if not codes:
+                print(
+                    "No se agregó "
+                    "el filtro de keywords."
+                )
+                continue
+
+            filters.append(
+                build_keyword_query(
+                    language,
+                    codes,
+                )
+            )
+
+        else:
+            filters.append(
+                build_single_filter(
+                    field
+                )
+            )
+
+        more = input(
+            "¿Agregar otro filtro? [s/N]: "
+        ).strip().lower()
+
+        if more not in {
+            "s",
+            "si",
+            "sí",
+            "y",
+            "yes",
+        }:
+            break
+
+    if not filters:
+        return {}
+
+    if len(filters) == 1:
+        return filters[0]
+
+    return {
+        "$and": filters
+    }
+
+
+# ============================================================================
+# QUERY OPTIONS
+# ============================================================================
+
+def ask_limit() -> int:
+    raw = input(
+        "\nCantidad a mostrar "
+        "(Enter=20, 0=todos): "
+    ).strip()
+
+    if not raw:
+        return 20
+
+    try:
+        return max(
+            int(raw),
+            0,
+        )
+
+    except ValueError:
+        return 20
+
+
+def ask_sort(
+    fields: list[str],
+):
+    option = input(
+        "\n¿Ordenar resultados? [s/N]: "
+    ).strip().lower()
+
+    if option not in {
+        "s",
+        "si",
+        "sí",
+        "y",
+        "yes",
+    }:
+        return None
+
+    field = choose_field_by_number(
+        fields,
+        prompt="Número del campo: ",
+        show_menu=True,
+    )
+
+    if field is None:
+        return None
+
+    print(
+        "\nDirección:"
+    )
+    print(
+        "1. Ascendente"
+    )
+    print(
+        "2. Descendente"
+    )
+
+    direction = input(
+        "Opción: "
+    ).strip()
+
+    return (
+        field,
+        -1 if direction == "2" else 1,
     )
 
 
@@ -1106,27 +1616,26 @@ def query_by_language(
 def show_distinct_values(
     collection,
     fields,
+    keyword_maps,
 ):
-    show_fields(
-        fields
+    field = choose_field_by_number(
+        fields,
+        prompt="Número del campo: ",
+        show_menu=True,
     )
 
-    field = input(
-        "Campo: "
-    ).strip()
-
-    if field not in fields:
-        print(
-            "Campo no válido."
-        )
+    if field is None:
         return
 
     if field == "keywords":
-        print(
-            "\nLos códigos de keywords son internos. "
-            "Usa la opción 3 para consultar "
-            "por palabras reales.\n"
+        language = choose_language()
+
+        show_keyword_options(
+            keyword_maps,
+            language,
+            preview_terms=6,
         )
+
         return
 
     values = sorted(
@@ -1141,9 +1650,12 @@ def show_distinct_values(
         f"'{field}' ({len(values)}):"
     )
 
-    for value in values:
+    for index, value in enumerate(
+        values,
+        start=1,
+    ):
         print(
-            f"- {value}"
+            f"{index}. {value}"
         )
 
     print()
@@ -1407,7 +1919,7 @@ def print_menu():
         + "=" * 65
         + "\n1. Ver documentos"
         + "\n2. Filtrar por idioma"
-        + "\n3. Buscar por keyword real"
+        + "\n3. Filtrar por keyword / categoría"
         + "\n4. Consulta personalizada"
         + "\n5. Ver valores distintos de un campo"
         + "\n6. Contar documentos"
@@ -1544,7 +2056,8 @@ def main():
 
             elif option == "4":
                 query = ask_filters(
-                    fields
+                    fields,
+                    keyword_maps,
                 )
 
                 selected_fields = ask_selected_fields(
@@ -1596,6 +2109,7 @@ def main():
                 show_distinct_values(
                     collection,
                     fields,
+                    keyword_maps,
                 )
 
             elif option == "6":

@@ -2,18 +2,27 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
+import hashlib
 import logging
+import os
 import re
+import socket
+import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
+import certifi
 import requests
 import trafilatura
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+from pymongo import ASCENDING, MongoClient
+from pymongo.errors import PyMongoError
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -28,8 +37,6 @@ LANGUAGE_BY_FOLDER = {
     "hungarian": "hu",
 }
 
-# Metadata copied ONLY from the whitelist CSV.
-# language is derived from the folder.
 WHITELIST_FIELDS = [
     "eid",
     "indexed_date",
@@ -81,86 +88,526 @@ TRANSIENT_STATUS_CODES = [
 
 
 # ============================================================================
-# HELPERS
+# GENERAL HELPERS
 # ============================================================================
 
 def clean_text(value: Any) -> str | None:
     if value is None:
         return None
 
-    text = re.sub(r"[ \t\r\f\v]+", " ", str(value))
-    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(
+        r"[ \t\r\f\v]+",
+        " ",
+        str(value),
+    )
+
+    text = re.sub(
+        r"\n{3,}",
+        "\n\n",
+        text,
+    )
+
     text = text.strip()
 
     return text or None
 
 
-def normalize_header(header: str | None) -> str:
+def normalize_header(
+    header: str | None,
+) -> str:
     if header is None:
         return ""
 
     normalized = (
-        header.replace("\ufeff", "")
+        header
+        .replace("\ufeff", "")
         .strip()
         .lower()
     )
 
-    return HEADER_ALIASES.get(normalized, normalized)
+    return HEADER_ALIASES.get(
+        normalized,
+        normalized,
+    )
 
 
-def is_valid_http_url(url: str) -> bool:
+def is_valid_http_url(
+    url: str,
+) -> bool:
     try:
-        parsed = urlparse(url)
+        parsed = urlparse(
+            url
+        )
 
         return (
-            parsed.scheme in {"http", "https"}
+            parsed.scheme
+            in {"http", "https"}
             and bool(parsed.netloc)
         )
+
     except ValueError:
         return False
 
 
-def domain_from_url(url: str) -> str:
-    return urlparse(url).netloc.lower()
+def domain_from_url(
+    url: str,
+) -> str:
+    return urlparse(
+        url
+    ).netloc.lower()
 
+
+
+def hash_url(
+    url: str,
+) -> str:
+    """
+    Return a deterministic SHA-256 hash of the URL.
+
+    The original URL is preserved in `url`; this field is only an
+    additional stable identifier that can be indexed and queried.
+    """
+    normalized_url = url.strip()
+
+    return hashlib.sha256(
+        normalized_url.encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+# ============================================================================
+# MONGODB
+# ============================================================================
+
+def create_mongo_client(
+    uri: str,
+) -> MongoClient:
+    client = MongoClient(
+        uri,
+        tlsCAFile=certifi.where(),
+        serverSelectionTimeoutMS=10_000,
+        connectTimeoutMS=10_000,
+        socketTimeoutMS=30_000,
+        retryWrites=True,
+    )
+
+    # Fail immediately if credentials/network are wrong.
+    client.admin.command(
+        "ping"
+    )
+
+    return client
+
+
+def prepare_collection(
+    client: MongoClient,
+    database_name: str,
+    collection_name: str,
+):
+    collection = client[
+        database_name
+    ][
+        collection_name
+    ]
+
+    # One document per article + language + keyword family.
+    collection.create_index(
+        [
+            ("eid", ASCENDING),
+            ("language", ASCENDING),
+            ("keywords", ASCENDING),
+        ],
+        unique=True,
+        name="unique_eid_language_keywords",
+    )
+
+    collection.create_index(
+        [("publish_date", ASCENDING)],
+        name="publish_date_idx",
+    )
+
+    collection.create_index(
+        [("media_name", ASCENDING)],
+        name="media_name_idx",
+    )
+
+    collection.create_index(
+        [("language", ASCENDING)],
+        name="language_idx",
+    )
+
+    collection.create_index(
+        [("keywords", ASCENDING)],
+        name="keywords_idx",
+    )
+
+    collection.create_index(
+        [("hash", ASCENDING)],
+        name="hash_idx",
+    )
+
+    return collection
+
+
+def mongo_identity(
+    record: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "eid": record["eid"],
+        "language": record["language"],
+        "keywords": record["keywords"],
+    }
+
+
+def already_exists(
+    collection,
+    *,
+    eid: str,
+    language: str,
+    keyword: str,
+) -> bool:
+    return (
+        collection.find_one(
+            {
+                "eid": eid,
+                "language": language,
+                "keywords": keyword,
+            },
+            {"_id": 1},
+        )
+        is not None
+    )
+
+
+def upsert_record(
+    collection,
+    record: dict[str, Any],
+) -> str:
+    """
+    Returns:
+        inserted
+        updated
+        unchanged
+    """
+    result = collection.update_one(
+        mongo_identity(record),
+        {
+            "$set": record
+        },
+        upsert=True,
+    )
+
+    if result.upserted_id is not None:
+        return "inserted"
+
+    if result.modified_count > 0:
+        return "updated"
+
+    return "unchanged"
+
+
+
+# ============================================================================
+# AUDIT
+# ============================================================================
+
+AUDIT_COUNTER_KEYS = [
+    "total_rows",
+    "attempted",
+    "content_extracted",
+    "inserted",
+    "updated",
+    "unchanged",
+    "mongo_writes_successful",
+    "failed_mongo",
+    "skipped_existing",
+    "skipped_invalid",
+    "malformed_csv",
+    "skipped_empty",
+    "failed_scrape",
+]
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def empty_counters() -> dict[str, int]:
+    return {
+        key: 0
+        for key in AUDIT_COUNTER_KEYS
+    }
+
+
+def empty_language_stats() -> dict[str, dict[str, int]]:
+    return {
+        language: empty_counters()
+        for language in sorted(
+            set(LANGUAGE_BY_FOLDER.values())
+        )
+    }
+
+
+def increment_counter(
+    counters: dict[str, int],
+    language_stats: dict[str, dict[str, int]],
+    language: str,
+    key: str,
+    amount: int = 1,
+) -> None:
+    counters[key] += amount
+
+    if language not in language_stats:
+        language_stats[language] = empty_counters()
+
+    language_stats[language][key] += amount
+
+
+def get_git_commit() -> str | None:
+    """
+    Return the current Git commit when the script is executed inside a repo.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "rev-parse",
+                "--short",
+                "HEAD",
+            ],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        )
+
+        commit = result.stdout.strip()
+        return commit or None
+
+    except (
+        OSError,
+        subprocess.SubprocessError,
+    ):
+        return None
+
+
+def prepare_audit_collection(
+    client: MongoClient,
+    database_name: str,
+    collection_name: str,
+):
+    collection = client[
+        database_name
+    ][
+        collection_name
+    ]
+
+    collection.create_index(
+        [("run_id", ASCENDING)],
+        unique=True,
+        name="unique_run_id",
+    )
+
+    collection.create_index(
+        [("started_at", ASCENDING)],
+        name="started_at_idx",
+    )
+
+    collection.create_index(
+        [("status", ASCENDING)],
+        name="status_idx",
+    )
+
+    return collection
+
+
+def start_audit_run(
+    audit_collection,
+    *,
+    database_name: str,
+    collection_name: str,
+    audit_collection_name: str,
+    whitelist_root: Path,
+    csv_files_count: int,
+    options: dict[str, Any],
+) -> tuple[str, datetime, float]:
+    run_id = str(uuid4())
+    started_at = utc_now()
+    started_monotonic = time.monotonic()
+
+    document = {
+        "run_id": run_id,
+        "status": "running",
+        "started_at": started_at,
+        "finished_at": None,
+        "duration_seconds": None,
+        "source": {
+            "whitelist": str(
+                whitelist_root
+            ),
+            "csv_files": csv_files_count,
+            "csv_files_processed": 0,
+        },
+        "target": {
+            "database": database_name,
+            "collection": collection_name,
+            "audit_collection": (
+                audit_collection_name
+            ),
+        },
+        "options": options,
+        "records": empty_counters(),
+        "languages": empty_language_stats(),
+        "git_commit": get_git_commit(),
+        "host": socket.gethostname(),
+        "error": None,
+    }
+
+    audit_collection.insert_one(
+        document
+    )
+
+    logging.info(
+        "Audit started | run_id=%s",
+        run_id,
+    )
+
+    return (
+        run_id,
+        started_at,
+        started_monotonic,
+    )
+
+
+def update_audit_progress(
+    audit_collection,
+    run_id: str,
+    *,
+    counters: dict[str, int],
+    language_stats: dict[str, dict[str, int]],
+    csv_files_processed: int,
+) -> None:
+    audit_collection.update_one(
+        {
+            "run_id": run_id
+        },
+        {
+            "$set": {
+                "records": counters,
+                "languages": language_stats,
+                "source.csv_files_processed": (
+                    csv_files_processed
+                ),
+                "last_progress_at": utc_now(),
+            }
+        },
+    )
+
+
+def finish_audit_run(
+    audit_collection,
+    run_id: str,
+    *,
+    status: str,
+    started_monotonic: float,
+    counters: dict[str, int],
+    language_stats: dict[str, dict[str, int]],
+    csv_files_processed: int,
+    error: dict[str, str] | None = None,
+) -> None:
+    finished_at = utc_now()
+
+    duration_seconds = round(
+        time.monotonic()
+        - started_monotonic,
+        3,
+    )
+
+    audit_collection.update_one(
+        {
+            "run_id": run_id
+        },
+        {
+            "$set": {
+                "status": status,
+                "finished_at": finished_at,
+                "duration_seconds": (
+                    duration_seconds
+                ),
+                "records": counters,
+                "languages": language_stats,
+                "source.csv_files_processed": (
+                    csv_files_processed
+                ),
+                "error": error,
+            }
+        },
+    )
+
+    logging.info(
+        "Audit finished | run_id=%s | "
+        "status=%s | duration=%.3fs",
+        run_id,
+        status,
+        duration_seconds,
+    )
 
 # ============================================================================
 # PER-DOMAIN RATE LIMITING
 # ============================================================================
 
 class DomainRateLimiter:
-    """
-    Ensures a minimum delay between requests to the same domain.
+    def __init__(
+        self,
+        delay_seconds: float,
+    ) -> None:
+        self.delay_seconds = (
+            delay_seconds
+        )
 
-    Different domains do not share the same timer.
-    """
+        self.last_request: dict[
+            str,
+            float,
+        ] = {}
 
-    def __init__(self, delay_seconds: float) -> None:
-        self.delay_seconds = delay_seconds
-        self.last_request: dict[str, float] = {}
-
-    def wait(self, url: str) -> None:
-        domain = domain_from_url(url)
+    def wait(
+        self,
+        url: str,
+    ) -> None:
+        domain = domain_from_url(
+            url
+        )
 
         if not domain:
             return
 
         now = time.monotonic()
-        previous = self.last_request.get(domain)
+
+        previous = (
+            self.last_request
+            .get(domain)
+        )
 
         if previous is not None:
-            elapsed = now - previous
-            remaining = self.delay_seconds - elapsed
+            elapsed = (
+                now - previous
+            )
+
+            remaining = (
+                self.delay_seconds
+                - elapsed
+            )
 
             if remaining > 0:
-                logging.debug(
-                    "Rate limit: waiting %.2fs for %s",
-                    remaining,
-                    domain,
+                time.sleep(
+                    remaining
                 )
-                time.sleep(remaining)
 
-        self.last_request[domain] = time.monotonic()
+        self.last_request[
+            domain
+        ] = time.monotonic()
 
 
 # ============================================================================
@@ -169,72 +616,159 @@ class DomainRateLimiter:
 
 class RobotsCache:
     """
-    Cache robots.txt by origin so it is not downloaded for every article.
+    robots.txt is checked once per origin.
+
+    Important:
+    it uses a short timeout and NO retry loop so a broken robots.txt
+    endpoint cannot stall the whole pipeline for several minutes.
     """
 
     def __init__(
         self,
-        session: requests.Session,
         limiter: DomainRateLimiter,
-        timeout: int,
+        timeout: float = 5.0,
     ) -> None:
-        self.session = session
         self.limiter = limiter
         self.timeout = timeout
-        self.cache: dict[str, RobotFileParser | None] = {}
 
-    def can_fetch(self, url: str) -> bool:
-        parsed = urlparse(url)
-        origin = f"{parsed.scheme}://{parsed.netloc}"
+        self.cache: dict[
+            str,
+            RobotFileParser | None,
+        ] = {}
+
+        # Dedicated session WITHOUT retry adapter.
+        self.session = (
+            requests.Session()
+        )
+
+        self.session.headers.update(
+            REQUEST_HEADERS
+        )
+
+    def can_fetch(
+        self,
+        url: str,
+    ) -> bool:
+        parsed = urlparse(
+            url
+        )
+
+        origin = (
+            f"{parsed.scheme}://"
+            f"{parsed.netloc}"
+        )
 
         if origin in self.cache:
-            parser = self.cache[origin]
-            return True if parser is None else parser.can_fetch("*", url)
+            parser = self.cache[
+                origin
+            ]
 
-        robots_url = origin + "/robots.txt"
-
-        try:
-            self.limiter.wait(robots_url)
-
-            response = self.session.get(
-                robots_url,
-                timeout=self.timeout,
+            return (
+                True
+                if parser is None
+                else parser.can_fetch(
+                    "*",
+                    url,
+                )
             )
 
-            if response.status_code == 200:
-                parser = RobotFileParser()
-                parser.set_url(robots_url)
-                parser.parse(response.text.splitlines())
-                self.cache[origin] = parser
+        robots_url = (
+            origin
+            + "/robots.txt"
+        )
 
-                return parser.can_fetch("*", url)
+        try:
+            self.limiter.wait(
+                robots_url
+            )
 
-            # If robots.txt is not available, continue conservatively
-            # without trying to interpret the missing file.
-            self.cache[origin] = None
+            response = (
+                self.session.get(
+                    robots_url,
+                    timeout=(
+                        self.timeout,
+                        self.timeout,
+                    ),
+                )
+            )
+
+            if (
+                response.status_code
+                == 200
+            ):
+                parser = (
+                    RobotFileParser()
+                )
+
+                parser.set_url(
+                    robots_url
+                )
+
+                parser.parse(
+                    response.text
+                    .splitlines()
+                )
+
+                self.cache[
+                    origin
+                ] = parser
+
+                return (
+                    parser.can_fetch(
+                        "*",
+                        url,
+                    )
+                )
+
+            self.cache[
+                origin
+            ] = None
+
             return True
 
         except requests.RequestException:
-            self.cache[origin] = None
+            logging.warning(
+                "robots.txt unavailable for %s; "
+                "continuing with article.",
+                origin,
+            )
+
+            self.cache[
+                origin
+            ] = None
+
             return True
 
+    def close(
+        self,
+    ) -> None:
+        self.session.close()
+
 
 # ============================================================================
-# REQUESTS SESSION WITH RETRIES
+# HTTP SESSION
 # ============================================================================
 
-def create_session() -> requests.Session:
+def create_http_session() -> requests.Session:
     session = requests.Session()
-    session.headers.update(REQUEST_HEADERS)
 
+    session.headers.update(
+        REQUEST_HEADERS
+    )
+
+    # One retry for temporary network/server errors.
     retry_strategy = Retry(
-        total=3,
-        connect=3,
-        read=3,
-        status=3,
-        backoff_factor=2,
-        status_forcelist=TRANSIENT_STATUS_CODES,
-        allowed_methods=frozenset(["GET"]),
+        total=1,
+        connect=1,
+        read=1,
+        status=1,
+        backoff_factor=1,
+        status_forcelist=(
+            TRANSIENT_STATUS_CODES
+        ),
+        allowed_methods=frozenset(
+            ["GET"]
+        ),
         respect_retry_after_header=True,
         raise_on_status=False,
     )
@@ -245,14 +779,21 @@ def create_session() -> requests.Session:
         pool_maxsize=20,
     )
 
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
+    session.mount(
+        "http://",
+        adapter,
+    )
+
+    session.mount(
+        "https://",
+        adapter,
+    )
 
     return session
 
 
 # ============================================================================
-# ARTICLE CONTENT EXTRACTION
+# CONTENT EXTRACTION
 # ============================================================================
 
 def extract_content_from_html(
@@ -275,34 +816,50 @@ def extract_content_from_html(
     ]
 
     for selector in selectors:
-        container = soup.select_one(selector)
+        container = (
+            soup.select_one(
+                selector
+            )
+        )
 
         if not container:
             continue
 
-        paragraphs: list[str] = []
+        paragraphs: list[
+            str
+        ] = []
 
-        for paragraph in container.find_all("p"):
+        for paragraph in (
+            container.find_all(
+                "p"
+            )
+        ):
             text = clean_text(
-                paragraph.get_text(" ", strip=True)
+                paragraph.get_text(
+                    " ",
+                    strip=True,
+                )
             )
 
-            if text and len(text) >= 30:
-                paragraphs.append(text)
+            if (
+                text
+                and len(text) >= 30
+            ):
+                paragraphs.append(
+                    text
+                )
 
         if paragraphs:
-            return "\n\n".join(paragraphs)
+            return "\n\n".join(
+                paragraphs
+            )
 
     return None
 
 
-def extract_content(html: str) -> str | None:
-    """
-    Main extraction:
-    1. Trafilatura
-    2. BeautifulSoup article-body fallback
-    """
-
+def extract_content(
+    html: str,
+) -> str | None:
     content = trafilatura.extract(
         html,
         output_format="txt",
@@ -314,9 +871,14 @@ def extract_content(html: str) -> str | None:
     )
 
     if content:
-        content = clean_text(content)
+        content = clean_text(
+            content
+        )
 
-        if content and len(content) >= 100:
+        if (
+            content
+            and len(content) >= 100
+        ):
             return content
 
     soup = BeautifulSoup(
@@ -324,31 +886,35 @@ def extract_content(html: str) -> str | None:
         "html.parser",
     )
 
-    return extract_content_from_html(soup)
+    return (
+        extract_content_from_html(
+            soup
+        )
+    )
 
 
 # ============================================================================
-# PLAYWRIGHT FALLBACK
+# PLAYWRIGHT FALLBACK FOR 403
 # ============================================================================
 
 class BrowserFallback:
-    """
-    Lazy Playwright browser.
+    def __init__(
+        self,
+        timeout_seconds: int,
+    ) -> None:
+        self.timeout_ms = (
+            timeout_seconds
+            * 1000
+        )
 
-    It is launched only if a site returns HTTP 403 through requests.
-
-    This does NOT try to solve CAPTCHAs, bypass paywalls, log in, or defeat
-    explicit anti-bot challenges.
-    """
-
-    def __init__(self, timeout_seconds: int) -> None:
-        self.timeout_ms = timeout_seconds * 1000
         self.playwright = None
         self.browser = None
         self.context = None
         self.available = True
 
-    def _ensure_started(self) -> bool:
+    def _ensure_started(
+        self,
+    ) -> bool:
         if not self.available:
             return False
 
@@ -356,22 +922,39 @@ class BrowserFallback:
             return True
 
         try:
-            from playwright.sync_api import sync_playwright
-
-            self.playwright = sync_playwright().start()
-
-            self.browser = self.playwright.chromium.launch(
-                headless=True,
+            from playwright.sync_api import (
+                sync_playwright,
             )
 
-            self.context = self.browser.new_context(
-                user_agent=REQUEST_HEADERS["User-Agent"],
-                locale="en-US",
-                extra_http_headers={
-                    "Accept-Language": REQUEST_HEADERS[
-                        "Accept-Language"
-                    ],
-                },
+            self.playwright = (
+                sync_playwright()
+                .start()
+            )
+
+            self.browser = (
+                self.playwright
+                .chromium
+                .launch(
+                    headless=True
+                )
+            )
+
+            self.context = (
+                self.browser
+                .new_context(
+                    user_agent=(
+                        REQUEST_HEADERS[
+                            "User-Agent"
+                        ]
+                    ),
+                    locale="en-US",
+                    extra_http_headers={
+                        "Accept-Language":
+                            REQUEST_HEADERS[
+                                "Accept-Language"
+                            ],
+                    },
+                )
             )
 
             return True
@@ -383,7 +966,7 @@ class BrowserFallback:
             )
 
             logging.warning(
-                "Install it with: "
+                "Install with: "
                 "pip install playwright && "
                 "playwright install chromium"
             )
@@ -391,11 +974,17 @@ class BrowserFallback:
             self.available = False
             return False
 
-    def fetch_html(self, url: str) -> str | None:
+    def fetch_html(
+        self,
+        url: str,
+    ) -> str | None:
         if not self._ensure_started():
             return None
 
-        page = self.context.new_page()
+        page = (
+            self.context
+            .new_page()
+        )
 
         try:
             logging.info(
@@ -405,12 +994,16 @@ class BrowserFallback:
 
             response = page.goto(
                 url,
-                wait_until="domcontentloaded",
+                wait_until=(
+                    "domcontentloaded"
+                ),
                 timeout=self.timeout_ms,
             )
 
             if response is not None:
-                status = response.status
+                status = (
+                    response.status
+                )
 
                 if status >= 400:
                     logging.warning(
@@ -420,15 +1013,20 @@ class BrowserFallback:
                     )
                     return None
 
-            # Small wait for normal client-side rendering.
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(
+                1500
+            )
 
-            html = page.content()
+            html = (
+                page.content()
+            )
 
-            if looks_like_block_page(html):
+            if looks_like_block_page(
+                html
+            ):
                 logging.warning(
                     "Browser challenge/paywall detected. "
-                    "Skipping instead of bypassing it: %s",
+                    "Skipping: %s",
                     url,
                 )
                 return None
@@ -441,12 +1039,15 @@ class BrowserFallback:
                 url,
                 exc,
             )
+
             return None
 
         finally:
             page.close()
 
-    def close(self) -> None:
+    def close(
+        self,
+    ) -> None:
         try:
             if self.context is not None:
                 self.context.close()
@@ -461,12 +1062,9 @@ class BrowserFallback:
             pass
 
 
-def looks_like_block_page(html: str) -> bool:
-    """
-    Avoid storing obvious CAPTCHA / anti-bot / subscription screens
-    as if they were article content.
-    """
-
+def looks_like_block_page(
+    html: str,
+) -> bool:
     lowered = html.lower()
 
     markers = [
@@ -489,7 +1087,7 @@ def looks_like_block_page(html: str) -> bool:
 
 
 # ============================================================================
-# DOWNLOAD STRATEGY
+# ARTICLE DOWNLOAD
 # ============================================================================
 
 def download_article(
@@ -500,65 +1098,75 @@ def download_article(
     url: str,
     timeout: int,
 ) -> str | None:
-    """
-    Strategy:
-
-        requests
-            |
-            +-- 200 ------> extract content
-            |
-            +-- 429/5xx --> automatic retry/backoff
-            |
-            +-- 403 ------> Playwright fallback
-            |
-            +-- other 4xx -> skip
-    """
-
-    if not robots.can_fetch(url):
+    if not robots.can_fetch(
+        url
+    ):
         logging.warning(
             "robots.txt does not allow fetching: %s",
             url,
         )
+
         return None
 
-    limiter.wait(url)
+    limiter.wait(
+        url
+    )
 
     response = session.get(
         url,
-        timeout=timeout,
+        timeout=(
+            10,
+            timeout,
+        ),
         allow_redirects=True,
     )
 
-    if response.status_code == 403:
-        html = browser.fetch_html(url)
+    if (
+        response.status_code
+        == 403
+    ):
+        html = (
+            browser.fetch_html(
+                url
+            )
+        )
 
         if not html:
             return None
 
-        return extract_content(html)
+        return extract_content(
+            html
+        )
 
-    if response.status_code == 429:
+    if (
+        response.status_code
+        == 429
+    ):
         logging.warning(
-            "Still rate-limited after retries (429): %s",
+            "Still rate-limited after retry (429): %s",
             url,
         )
+
         return None
 
-    if 400 <= response.status_code < 500:
+    if (
+        400
+        <= response.status_code
+        < 500
+    ):
         logging.warning(
             "HTTP %d. Skipping: %s",
             response.status_code,
             url,
         )
+
         return None
 
     response.raise_for_status()
 
-    content = extract_content(
+    return extract_content(
         response.text
     )
-
-    return content
 
 
 # ============================================================================
@@ -575,26 +1183,35 @@ def language_from_csv_path(
 
     if len(relative.parts) < 2:
         raise ValueError(
-            f"CSV must be inside a language folder: "
-            f"{csv_path}"
+            "CSV must be inside a "
+            f"language folder: {csv_path}"
         )
 
-    language_folder = relative.parts[0].lower()
+    language_folder = (
+        relative.parts[0]
+        .lower()
+    )
 
-    if language_folder not in LANGUAGE_BY_FOLDER:
+    if (
+        language_folder
+        not in LANGUAGE_BY_FOLDER
+    ):
         supported = ", ".join(
             LANGUAGE_BY_FOLDER
         )
 
         raise ValueError(
             f"Unknown language folder "
-            f"'{language_folder}' for {csv_path}. "
-            f"Supported: {supported}"
+            f"'{language_folder}' for "
+            f"{csv_path}. Supported: "
+            f"{supported}"
         )
 
-    return LANGUAGE_BY_FOLDER[
-        language_folder
-    ]
+    return (
+        LANGUAGE_BY_FOLDER[
+            language_folder
+        ]
+    )
 
 
 def keyword_from_csv_path(
@@ -608,7 +1225,8 @@ def find_csv_files(
 ) -> list[Path]:
     return sorted(
         path
-        for path in whitelist_root.rglob(
+        for path
+        in whitelist_root.rglob(
             "*.csv"
         )
         if path.is_file()
@@ -616,7 +1234,7 @@ def find_csv_files(
 
 
 # ============================================================================
-# ROBUST CSV READING
+# CSV READING
 # ============================================================================
 
 def detect_dialect(
@@ -627,7 +1245,9 @@ def detect_dialect(
         encoding="utf-8-sig",
         newline="",
     ) as file:
-        sample = file.read(8192)
+        sample = file.read(
+            8192
+        )
 
     try:
         return csv.Sniffer().sniff(
@@ -641,7 +1261,13 @@ def detect_dialect(
 
 def read_csv_rows(
     csv_path: Path,
-) -> tuple[list[str], list[dict[str, str]]]:
+) -> tuple[
+    list[str],
+    list[
+        tuple[int, dict[str, str]]
+    ],
+    int,
+]:
     dialect = detect_dialect(
         csv_path
     )
@@ -657,28 +1283,41 @@ def read_csv_rows(
         )
 
         raw_headers = (
-            reader.fieldnames or []
+            reader.fieldnames
+            or []
         )
 
         normalized_headers = [
-            normalize_header(header)
+            normalize_header(
+                header
+            )
             for header in raw_headers
         ]
 
         if not normalized_headers:
             raise ValueError(
-                f"CSV has no header: {csv_path}"
+                f"CSV has no header: "
+                f"{csv_path}"
             )
 
-        rows: list[dict[str, str]] = []
+        rows: list[
+            tuple[
+                int,
+                dict[str, str],
+            ]
+        ] = []
 
-        for line_number, raw_row in enumerate(
-            reader,
-            start=2,
-        ):
-            # DictReader stores surplus unquoted CSV columns
-            # under the None key.
-            if raw_row.get(None):
+        malformed_count = 0
+
+        for raw_row in reader:
+            # reader.line_num is the physical CSV line reached by the parser.
+            line_number = reader.line_num
+
+            if raw_row.get(
+                None
+            ):
+                malformed_count += 1
+
                 logging.error(
                     "%s:%d malformed CSV row "
                     "(extra columns, likely an unquoted comma). "
@@ -686,27 +1325,40 @@ def read_csv_rows(
                     csv_path,
                     line_number,
                 )
+
                 continue
 
-            normalized_row: dict[str, str] = {}
+            normalized_row: dict[
+                str,
+                str,
+            ] = {}
 
-            for raw_key, value in raw_row.items():
-                key = normalize_header(
-                    raw_key
+            for (
+                raw_key,
+                value,
+            ) in raw_row.items():
+                key = (
+                    normalize_header(
+                        raw_key
+                    )
                 )
 
                 if key:
-                    normalized_row[key] = (
-                        value
-                    )
+                    normalized_row[
+                        key
+                    ] = value
 
             rows.append(
-                normalized_row
+                (
+                    line_number,
+                    normalized_row,
+                )
             )
 
     return (
         normalized_headers,
         rows,
+        malformed_count,
     )
 
 
@@ -714,7 +1366,6 @@ def validate_columns(
     fieldnames: list[str],
     csv_path: Path,
 ) -> None:
-    # language deliberately NOT required.
     required = set(
         WHITELIST_FIELDS
     )
@@ -724,23 +1375,25 @@ def validate_columns(
     )
 
     missing = sorted(
-        required - available
+        required
+        - available
     )
 
     if missing:
         raise ValueError(
-            f"\nCSV inválido: {csv_path}\n"
+            f"\nCSV inválido: "
+            f"{csv_path}\n"
             f"Columnas detectadas: "
             f"{sorted(available)}\n"
             f"Columnas faltantes: "
             f"{missing}\n"
-            f"Se acepta 'id' o 'eid' "
-            f"para el identificador."
+            f"Se acepta 'id' o "
+            f"'eid' para el identificador."
         )
 
 
 # ============================================================================
-# JSON CONSTRUCTION
+# DOCUMENT BUILDING
 # ============================================================================
 
 def build_record(
@@ -749,112 +1402,124 @@ def build_record(
     language: str,
     keyword: str,
     content: str | None,
-) -> dict:
-    """
-    Final JSON:
-    - whitelist metadata
-    - language from folder
-    - keywords from CSV filename
-    - contenido scraped from article
-    """
+) -> dict[str, Any]:
+    record: dict[
+        str,
+        Any,
+    ] = {}
 
-    record: dict[str, Any] = {}
-
-    for field in WHITELIST_FIELDS:
+    for field in (
+        WHITELIST_FIELDS
+    ):
         value = row.get(
             field
         )
 
-        if isinstance(value, str):
+        if isinstance(
+            value,
+            str,
+        ):
             value = (
                 value.strip()
                 or None
             )
 
-        record[field] = value
+        record[
+            field
+        ] = value
 
-    record["language"] = language
-    record["keywords"] = keyword
-    record["contenido"] = content
+    record[
+        "language"
+    ] = language
+
+    record[
+        "keywords"
+    ] = keyword
+
+    record[
+        "hash"
+    ] = hash_url(
+        record["url"]
+    )
+
+    record[
+        "contenido"
+    ] = content
 
     return record
 
 
-def load_existing_output(
-    output_path: Path,
-) -> list[dict]:
-    if not output_path.exists():
-        return []
-
-    with output_path.open(
-        "r",
-        encoding="utf-8",
-    ) as file:
-        data = json.load(
-            file
-        )
-
-    if not isinstance(
-        data,
-        list,
+def validate_record(
+    record: dict[str, Any],
+) -> tuple[
+    bool,
+    str | None,
+]:
+    if not record.get(
+        "eid"
     ):
-        raise ValueError(
-            f"Existing output must be a "
-            f"JSON array: {output_path}"
+        return (
+            False,
+            "empty eid",
         )
 
-    return data
-
-
-def save_json(
-    records: list[dict],
-    output_path: Path,
-) -> None:
-    output_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    temp_path = output_path.with_suffix(
-        output_path.suffix + ".tmp"
-    )
-
-    with temp_path.open(
-        "w",
-        encoding="utf-8",
-    ) as file:
-        json.dump(
-            records,
-            file,
-            ensure_ascii=False,
-            indent=2,
+    if not record.get(
+        "language"
+    ):
+        return (
+            False,
+            "empty language",
         )
 
-    temp_path.replace(
-        output_path
+    if not record.get(
+        "keywords"
+    ):
+        return (
+            False,
+            "empty keywords",
+        )
+
+    if not record.get(
+        "url"
+    ):
+        return (
+            False,
+            "empty url",
+        )
+
+    return (
+        True,
+        None,
     )
 
 
 # ============================================================================
-# MAIN PROCESS
+# SCRAPE -> MONGO PIPELINE
 # ============================================================================
 
-def process_whitelist(
+def process_whitelist_to_mongo(
     whitelist_root: Path,
-    output_path: Path,
+    collection,
     *,
+    counters: dict[str, int],
+    language_stats: dict[str, dict[str, int]],
+    progress_state: dict[str, int],
+    audit_collection=None,
+    run_id: str | None = None,
+    audit_progress_every: int = 100,
     delay: float = 2.5,
-    timeout: int = 25,
+    timeout: int = 20,
+    robots_timeout: float = 5.0,
     resume: bool = False,
-) -> list[dict]:
-
+    skip_empty_content: bool = False,
+) -> int:
     csv_files = find_csv_files(
         whitelist_root
     )
 
     if not csv_files:
         raise FileNotFoundError(
-            f"No CSV files found inside: "
+            "No CSV files found inside: "
             f"{whitelist_root}"
         )
 
@@ -863,40 +1528,68 @@ def process_whitelist(
         len(csv_files),
     )
 
-    records = (
-        load_existing_output(
-            output_path
-        )
-        if resume
-        else []
+    session = (
+        create_http_session()
     )
 
-    completed_keys = {
-        (
-            record.get("url"),
-            record.get("keywords"),
-            record.get("language"),
+    limiter = (
+        DomainRateLimiter(
+            delay_seconds=delay
         )
-        for record in records
-    }
-
-    session = create_session()
-
-    limiter = DomainRateLimiter(
-        delay_seconds=delay
     )
 
     robots = RobotsCache(
-        session=session,
         limiter=limiter,
-        timeout=timeout,
+        timeout=robots_timeout,
     )
 
     browser = BrowserFallback(
-        timeout_seconds=timeout,
+        timeout_seconds=timeout
     )
 
-    total_processed = 0
+    progress_events = 0
+
+    def checkpoint() -> None:
+        nonlocal progress_events
+
+        progress_events += 1
+
+        if (
+            audit_collection is None
+            or run_id is None
+            or audit_progress_every <= 0
+        ):
+            return
+
+        if (
+            progress_events
+            % audit_progress_every
+            != 0
+        ):
+            return
+
+        try:
+            update_audit_progress(
+                audit_collection,
+                run_id,
+                counters=counters,
+                language_stats=(
+                    language_stats
+                ),
+                csv_files_processed=(
+                    progress_state[
+                        "csv_files_processed"
+                    ]
+                ),
+            )
+
+        except PyMongoError as exc:
+            # Audit progress failure should not discard successfully
+            # scraped news. The final audit update will be attempted again.
+            logging.error(
+                "Could not update audit progress: %s",
+                exc,
+            )
 
     try:
         for csv_path in csv_files:
@@ -914,23 +1607,54 @@ def process_whitelist(
             )
 
             logging.info(
-                "Reading %s | language=%s | "
-                "keywords=%s",
+                "Reading %s | language=%s | keywords=%s",
                 csv_path,
                 language,
                 keyword,
             )
 
-            fieldnames, rows = (
-                read_csv_rows(
-                    csv_path
-                )
+            (
+                fieldnames,
+                rows,
+                malformed_count,
+            ) = read_csv_rows(
+                csv_path
             )
 
             validate_columns(
                 fieldnames,
                 csv_path,
             )
+
+            total_rows_in_file = (
+                len(rows)
+                + malformed_count
+            )
+
+            increment_counter(
+                counters,
+                language_stats,
+                language,
+                "total_rows",
+                total_rows_in_file,
+            )
+
+            if malformed_count:
+                increment_counter(
+                    counters,
+                    language_stats,
+                    language,
+                    "malformed_csv",
+                    malformed_count,
+                )
+
+                increment_counter(
+                    counters,
+                    language_stats,
+                    language,
+                    "skipped_invalid",
+                    malformed_count,
+                )
 
             logging.info(
                 "Detected columns: %s",
@@ -939,52 +1663,111 @@ def process_whitelist(
                 ),
             )
 
-            for row_number, row in enumerate(
-                rows,
-                start=2,
-            ):
+            for (
+                row_number,
+                row,
+            ) in rows:
                 url = (
-                    row.get("url")
+                    row.get(
+                        "url"
+                    )
                     or ""
                 ).strip()
 
-                if not url:
-                    logging.warning(
-                        "%s:%d has no URL. "
-                        "Skipping.",
+                eid = (
+                    row.get(
+                        "eid"
+                    )
+                    or ""
+                ).strip()
+
+                if not eid:
+                    logging.error(
+                        "%s:%d empty eid. Skipping.",
                         csv_path,
                         row_number,
                     )
+
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "skipped_invalid",
+                    )
+
+                    checkpoint()
+                    continue
+
+                if not url:
+                    logging.error(
+                        "%s:%d empty URL. Skipping.",
+                        csv_path,
+                        row_number,
+                    )
+
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "skipped_invalid",
+                    )
+
+                    checkpoint()
                     continue
 
                 if not is_valid_http_url(
                     url
                 ):
                     logging.error(
-                        "%s:%d invalid URL from CSV: %r. "
-                        "Skipping.",
+                        "%s:%d invalid URL: %r. Skipping.",
                         csv_path,
                         row_number,
                         url,
                     )
-                    continue
 
-                record_key = (
-                    url,
-                    keyword,
-                    language,
-                )
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "skipped_invalid",
+                    )
+
+                    checkpoint()
+                    continue
 
                 if (
                     resume
-                    and record_key
-                    in completed_keys
+                    and already_exists(
+                        collection,
+                        eid=eid,
+                        language=language,
+                        keyword=keyword,
+                    )
                 ):
                     logging.info(
-                        "Already processed, skipping: %s",
-                        url,
+                        "Already in MongoDB, skipping: "
+                        "eid=%s | language=%s | keywords=%s",
+                        eid,
+                        language,
+                        keyword,
                     )
+
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "skipped_existing",
+                    )
+
+                    checkpoint()
                     continue
+
+                increment_counter(
+                    counters,
+                    language_stats,
+                    language,
+                    "attempted",
+                )
 
                 logging.info(
                     "Scraping: %s",
@@ -1006,17 +1789,39 @@ def process_whitelist(
                     )
 
                     if content:
+                        increment_counter(
+                            counters,
+                            language_stats,
+                            language,
+                            "content_extracted",
+                        )
+
                         logging.info(
                             "Content extracted: %d chars",
                             len(content),
                         )
+
                     else:
+                        increment_counter(
+                            counters,
+                            language_stats,
+                            language,
+                            "failed_scrape",
+                        )
+
                         logging.warning(
                             "No content extracted: %s",
                             url,
                         )
 
                 except requests.RequestException as exc:
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "failed_scrape",
+                    )
+
                     logging.error(
                         "HTTP error for %s: %s",
                         url,
@@ -1024,8 +1829,16 @@ def process_whitelist(
                     )
 
                 except Exception as exc:
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "failed_scrape",
+                    )
+
                     logging.exception(
-                        "Unexpected error for %s: %s",
+                        "Unexpected scraping error "
+                        "for %s: %s",
                         url,
                         exc,
                     )
@@ -1037,35 +1850,163 @@ def process_whitelist(
                     content=content,
                 )
 
-                records.append(
-                    record
+                valid, error = (
+                    validate_record(
+                        record
+                    )
                 )
 
-                completed_keys.add(
-                    record_key
+                if not valid:
+                    logging.error(
+                        "Invalid document after scraping: %s",
+                        error,
+                    )
+
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "skipped_invalid",
+                    )
+
+                    checkpoint()
+                    continue
+
+                if (
+                    skip_empty_content
+                    and not content
+                ):
+                    logging.warning(
+                        "Not uploading because contenido is empty: %s",
+                        url,
+                    )
+
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "skipped_empty",
+                    )
+
+                    checkpoint()
+                    continue
+
+                try:
+                    status = (
+                        upsert_record(
+                            collection,
+                            record,
+                        )
+                    )
+
+                except PyMongoError as exc:
+                    increment_counter(
+                        counters,
+                        language_stats,
+                        language,
+                        "failed_mongo",
+                    )
+
+                    logging.error(
+                        "MongoDB write failed for eid=%s: %s",
+                        eid,
+                        exc,
+                    )
+
+                    checkpoint()
+                    raise
+
+                increment_counter(
+                    counters,
+                    language_stats,
+                    language,
+                    status,
                 )
 
-                total_processed += 1
-
-                # Checkpoint after every article.
-                save_json(
-                    records,
-                    output_path,
+                increment_counter(
+                    counters,
+                    language_stats,
+                    language,
+                    "mongo_writes_successful",
                 )
+
+                logging.info(
+                    "MongoDB %s | eid=%s | language=%s | keywords=%s",
+                    status.upper(),
+                    eid,
+                    language,
+                    keyword,
+                )
+
+                checkpoint()
+
+            progress_state[
+                "csv_files_processed"
+            ] += 1
+
+            if (
+                audit_collection is not None
+                and run_id is not None
+            ):
+                try:
+                    update_audit_progress(
+                        audit_collection,
+                        run_id,
+                        counters=counters,
+                        language_stats=(
+                            language_stats
+                        ),
+                        csv_files_processed=(
+                            progress_state[
+                                "csv_files_processed"
+                            ]
+                        ),
+                    )
+
+                except PyMongoError as exc:
+                    logging.error(
+                        "Could not update audit progress after CSV: %s",
+                        exc,
+                    )
 
     finally:
         browser.close()
+        robots.close()
         session.close()
 
     logging.info(
-        "Finished. %d new records processed. "
-        "%d total records written to %s",
-        total_processed,
-        len(records),
-        output_path,
+        "Pipeline finished | "
+        "total_rows=%d | "
+        "attempted=%d | "
+        "content_extracted=%d | "
+        "mongo_writes_successful=%d | "
+        "inserted=%d | "
+        "updated=%d | "
+        "unchanged=%d | "
+        "skipped_existing=%d | "
+        "skipped_invalid=%d | "
+        "malformed_csv=%d | "
+        "skipped_empty=%d | "
+        "failed_scrape=%d | "
+        "failed_mongo=%d",
+        counters["total_rows"],
+        counters["attempted"],
+        counters["content_extracted"],
+        counters["mongo_writes_successful"],
+        counters["inserted"],
+        counters["updated"],
+        counters["unchanged"],
+        counters["skipped_existing"],
+        counters["skipped_invalid"],
+        counters["malformed_csv"],
+        counters["skipped_empty"],
+        counters["failed_scrape"],
+        counters["failed_mongo"],
     )
 
-    return records
+    return progress_state[
+        "csv_files_processed"
+    ]
 
 
 # ============================================================================
@@ -1073,10 +2014,12 @@ def process_whitelist(
 # ============================================================================
 
 def main() -> None:
+    load_dotenv()
+
     parser = argparse.ArgumentParser(
         description=(
-            "Read whitelist CSV files, scrape article "
-            "content, and produce normalized JSON."
+            "Scrape whitelist news, upload each document "
+            "directly to MongoDB Atlas, and audit every run."
         )
     )
 
@@ -1090,11 +2033,49 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "--output",
-        default="news.json",
+        "--database",
+        default=os.getenv(
+            "MONGODB_DATABASE",
+            "dragons_app",
+        ),
         help=(
-            "Destination JSON file. "
-            "Default: news.json"
+            "MongoDB database. "
+            "Default: MONGODB_DATABASE"
+        ),
+    )
+
+    parser.add_argument(
+        "--collection",
+        default=os.getenv(
+            "MONGODB_COLLECTION",
+            "news",
+        ),
+        help=(
+            "MongoDB news collection. "
+            "Default: MONGODB_COLLECTION"
+        ),
+    )
+
+    parser.add_argument(
+        "--audit-collection",
+        default=os.getenv(
+            "MONGODB_AUDIT_COLLECTION",
+            "audit_runs",
+        ),
+        help=(
+            "MongoDB audit collection. "
+            "Default: audit_runs"
+        ),
+    )
+
+    parser.add_argument(
+        "--audit-progress-every",
+        type=int,
+        default=100,
+        help=(
+            "Save an audit progress snapshot every N processed "
+            "rows. Use 0 to disable periodic snapshots. "
+            "Default: 100"
         ),
     )
 
@@ -1111,10 +2092,20 @@ def main() -> None:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=25,
+        default=20,
         help=(
-            "HTTP/browser timeout in seconds. "
-            "Default: 25"
+            "Article/browser timeout in seconds. "
+            "Default: 20"
+        ),
+    )
+
+    parser.add_argument(
+        "--robots-timeout",
+        type=float,
+        default=5.0,
+        help=(
+            "robots.txt timeout in seconds. "
+            "Default: 5"
         ),
     )
 
@@ -1122,9 +2113,17 @@ def main() -> None:
         "--resume",
         action="store_true",
         help=(
-            "Continue from an existing JSON and "
-            "skip already processed "
-            "URL/keyword/language combinations."
+            "Skip documents that already exist "
+            "in MongoDB using eid + language + keywords."
+        ),
+    )
+
+    parser.add_argument(
+        "--skip-empty-content",
+        action="store_true",
+        help=(
+            "Do not upload records where "
+            "contenido could not be extracted."
         ),
     )
 
@@ -1138,17 +2137,253 @@ def main() -> None:
         ),
     )
 
-    process_whitelist(
-        Path(
-            args.whitelist
-        ).resolve(),
-        Path(
-            args.output
-        ).resolve(),
-        delay=args.delay,
-        timeout=args.timeout,
-        resume=args.resume,
+    uri = os.getenv(
+        "MONGODB_URI"
     )
+
+    if not uri:
+        raise RuntimeError(
+            "MONGODB_URI is not configured in .env"
+        )
+
+    whitelist_root = Path(
+        args.whitelist
+    ).resolve()
+
+    csv_files = find_csv_files(
+        whitelist_root
+    )
+
+    if not csv_files:
+        raise FileNotFoundError(
+            "No CSV files found inside: "
+            f"{whitelist_root}"
+        )
+
+    counters = empty_counters()
+    language_stats = (
+        empty_language_stats()
+    )
+
+    client = None
+    audit_collection = None
+    run_id = None
+    started_monotonic = None
+    progress_state = {
+        "csv_files_processed": 0
+    }
+
+    try:
+        logging.info(
+            "Connecting to MongoDB Atlas..."
+        )
+
+        client = create_mongo_client(
+            uri
+        )
+
+        logging.info(
+            "MongoDB connection successful."
+        )
+
+        # Prepare audit first so setup/runtime failures after connection
+        # can also be recorded.
+        audit_collection = (
+            prepare_audit_collection(
+                client,
+                args.database,
+                args.audit_collection,
+            )
+        )
+
+        (
+            run_id,
+            _started_at,
+            started_monotonic,
+        ) = start_audit_run(
+            audit_collection,
+            database_name=args.database,
+            collection_name=args.collection,
+            audit_collection_name=(
+                args.audit_collection
+            ),
+            whitelist_root=whitelist_root,
+            csv_files_count=len(
+                csv_files
+            ),
+            options={
+                "resume": args.resume,
+                "skip_empty_content": (
+                    args.skip_empty_content
+                ),
+                "delay_seconds": args.delay,
+                "timeout_seconds": args.timeout,
+                "robots_timeout_seconds": (
+                    args.robots_timeout
+                ),
+                "audit_progress_every": (
+                    args.audit_progress_every
+                ),
+            },
+        )
+
+        collection = prepare_collection(
+            client,
+            args.database,
+            args.collection,
+        )
+
+        logging.info(
+            "Target: %s.%s",
+            args.database,
+            args.collection,
+        )
+
+        logging.info(
+            "Audit collection: %s.%s",
+            args.database,
+            args.audit_collection,
+        )
+
+        process_whitelist_to_mongo(
+                whitelist_root,
+                collection,
+                counters=counters,
+                language_stats=(
+                    language_stats
+                ),
+                progress_state=(
+                    progress_state
+                ),
+                audit_collection=(
+                    audit_collection
+                ),
+                run_id=run_id,
+                audit_progress_every=(
+                    args.audit_progress_every
+                ),
+                delay=args.delay,
+                timeout=args.timeout,
+                robots_timeout=(
+                    args.robots_timeout
+                ),
+                resume=args.resume,
+                skip_empty_content=(
+                    args.skip_empty_content
+                ),
+            )
+
+        finish_audit_run(
+            audit_collection,
+            run_id,
+            status="completed",
+            started_monotonic=(
+                started_monotonic
+            ),
+            counters=counters,
+            language_stats=(
+                language_stats
+            ),
+            csv_files_processed=(
+                progress_state[
+                    "csv_files_processed"
+                ]
+            ),
+        )
+
+    except KeyboardInterrupt:
+        logging.warning(
+            "Execution interrupted by user."
+        )
+
+        if (
+            audit_collection is not None
+            and run_id is not None
+            and started_monotonic is not None
+        ):
+            try:
+                finish_audit_run(
+                    audit_collection,
+                    run_id,
+                    status="interrupted",
+                    started_monotonic=(
+                        started_monotonic
+                    ),
+                    counters=counters,
+                    language_stats=(
+                        language_stats
+                    ),
+                    csv_files_processed=(
+                        progress_state[
+                            "csv_files_processed"
+                        ]
+                    ),
+                    error={
+                        "type": (
+                            "KeyboardInterrupt"
+                        ),
+                        "message": (
+                            "Execution interrupted "
+                            "by user."
+                        ),
+                    },
+                )
+
+            except PyMongoError as audit_exc:
+                logging.error(
+                    "Could not finalize interrupted audit: %s",
+                    audit_exc,
+                )
+
+    except Exception as exc:
+        logging.exception(
+            "Pipeline failed: %s",
+            exc,
+        )
+
+        if (
+            audit_collection is not None
+            and run_id is not None
+            and started_monotonic is not None
+        ):
+            try:
+                finish_audit_run(
+                    audit_collection,
+                    run_id,
+                    status="failed",
+                    started_monotonic=(
+                        started_monotonic
+                    ),
+                    counters=counters,
+                    language_stats=(
+                        language_stats
+                    ),
+                    csv_files_processed=(
+                        progress_state[
+                            "csv_files_processed"
+                        ]
+                    ),
+                    error={
+                        "type": (
+                            type(exc).__name__
+                        ),
+                        "message": str(exc)[
+                            :2000
+                        ],
+                    },
+                )
+
+            except PyMongoError as audit_exc:
+                logging.error(
+                    "Could not finalize failed audit: %s",
+                    audit_exc,
+                )
+
+        raise
+
+    finally:
+        if client is not None:
+            client.close()
 
 
 if __name__ == "__main__":
