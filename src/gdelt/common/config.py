@@ -139,6 +139,11 @@ class MongoDBConfig:
     gkg_records_collection: str
     execution_metrics_collection: str
     crawled_data_collection: str
+    eventos_collection: str
+    queries_collection: str
+    whitelist_collection: str
+    scrapper_collection: str
+    metrics_collection: str
     connect_timeout_ms: int
     server_selection_timeout_ms: int
     ordered_inserts: bool
@@ -165,6 +170,11 @@ class MongoDBConfig:
                 "execution_metrics", "execution_metrics"
             ),
             crawled_data_collection=collections.get("crawled_data", "crawled_data"),
+            eventos_collection=collections.get("eventos", "eventos"),
+            queries_collection=collections.get("queries", "queries"),
+            whitelist_collection=collections.get("whitelist", "whitelist"),
+            scrapper_collection=collections.get("scrapper", "scrapper"),
+            metrics_collection=collections.get("metrics", "metrics"),
             connect_timeout_ms=int(raw.get("connect_timeout_ms", 5000)),
             server_selection_timeout_ms=int(
                 raw.get("server_selection_timeout_ms", 5000)

@@ -5,10 +5,15 @@ collections:
   gkg_records: gkg_records
   execution_metrics: execution_metrics
   crawled_data: crawled_data
+  eventos: eventos
+  queries: queries
+  whitelist: whitelist
+  scrapper: scrapper
+  metrics: metrics
 
 connect_timeout_ms: 30000
 server_selection_timeout_ms: 30000
 
-ordered_inserts: false  
+ordered_inserts: false
 
 ensure_indexes_on_startup: true

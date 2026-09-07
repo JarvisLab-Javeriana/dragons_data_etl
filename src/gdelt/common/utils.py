@@ -1,12 +1,18 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import Iterable, Iterator
 from datetime import datetime, timezone
 from typing import TypeVar
 
 T = TypeVar("T")
+
+
+def hash_identifier(value: str) -> str:
+    """Stable SHA-256 hex digest used as whitelist.hash / scrapper.hash_whitelist."""
+    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()
 
 
 def new_run_id(prefix: str = "run") -> str:

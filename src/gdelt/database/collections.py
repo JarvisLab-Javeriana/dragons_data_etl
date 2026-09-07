@@ -1,11 +1,11 @@
-
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import pymongo
 from pymongo.database import Database
+
+from src.gdelt.common.config import MongoDBConfig
 
 
 @dataclass(frozen=True)
@@ -36,21 +36,50 @@ CRAWLED_DATA_INDEXES: list[IndexSpec] = [
     IndexSpec(keys=[("status", pymongo.ASCENDING)], name="idx_crawled_status"),
 ]
 
+EVENTOS_INDEXES: list[IndexSpec] = [
+    IndexSpec(keys=[("id", pymongo.ASCENDING)], unique=True, name="uniq_evento_id"),
+    IndexSpec(keys=[("pais", pymongo.ASCENDING)], name="idx_evento_pais"),
+]
+
+QUERIES_INDEXES: list[IndexSpec] = [
+    IndexSpec(keys=[("id", pymongo.ASCENDING)], unique=True, name="uniq_query_id"),
+    IndexSpec(keys=[("id_evento", pymongo.ASCENDING)], name="idx_query_evento"),
+]
+
+WHITELIST_INDEXES: list[IndexSpec] = [
+    IndexSpec(keys=[("id", pymongo.ASCENDING)], unique=True, name="uniq_whitelist_id"),
+    IndexSpec(keys=[("hash", pymongo.ASCENDING)], unique=True, name="uniq_whitelist_hash"),
+    IndexSpec(keys=[("id_query", pymongo.ASCENDING)], name="idx_whitelist_query"),
+    IndexSpec(keys=[("id_metric", pymongo.ASCENDING)], name="idx_whitelist_metric"),
+    IndexSpec(keys=[("url", pymongo.ASCENDING)], name="idx_whitelist_url"),
+]
+
+SCRAPPER_INDEXES: list[IndexSpec] = [
+    IndexSpec(keys=[("id", pymongo.ASCENDING)], unique=True, name="uniq_scrapper_id"),
+    IndexSpec(keys=[("hash_whitelist", pymongo.ASCENDING)], unique=True, name="uniq_scrapper_hash"),
+]
+
+METRICS_INDEXES: list[IndexSpec] = [
+    IndexSpec(keys=[("id", pymongo.ASCENDING)], unique=True, name="uniq_metrics_id"),
+    IndexSpec(keys=[("id_query", pymongo.ASCENDING)], unique=True, name="uniq_metrics_query"),
+]
+
+
+def _apply_indexes(database: Database, collection_name: str, specs: list[IndexSpec]) -> None:
+    collection = database[collection_name]
+    for spec in specs:
+        collection.create_index(spec.keys, unique=spec.unique, name=spec.name)
+
 
 def ensure_indexes(
     database: Database,
-    gkg_records_collection: str,
-    execution_metrics_collection: str,
-    crawled_data_collection: str,
+    config: MongoDBConfig,
 ) -> None:
-    gkg_collection = database[gkg_records_collection]
-    for spec in GKG_RECORDS_INDEXES:
-        gkg_collection.create_index(spec.keys, unique=spec.unique, name=spec.name)
-
-    metrics_collection = database[execution_metrics_collection]
-    for spec in EXECUTION_METRICS_INDEXES:
-        metrics_collection.create_index(spec.keys, unique=spec.unique, name=spec.name)
-
-    crawled_collection = database[crawled_data_collection]
-    for spec in CRAWLED_DATA_INDEXES:
-        crawled_collection.create_index(spec.keys, unique=spec.unique, name=spec.name)
+    _apply_indexes(database, config.gkg_records_collection, GKG_RECORDS_INDEXES)
+    _apply_indexes(database, config.execution_metrics_collection, EXECUTION_METRICS_INDEXES)
+    _apply_indexes(database, config.crawled_data_collection, CRAWLED_DATA_INDEXES)
+    _apply_indexes(database, config.eventos_collection, EVENTOS_INDEXES)
+    _apply_indexes(database, config.queries_collection, QUERIES_INDEXES)
+    _apply_indexes(database, config.whitelist_collection, WHITELIST_INDEXES)
+    _apply_indexes(database, config.scrapper_collection, SCRAPPER_INDEXES)
+    _apply_indexes(database, config.metrics_collection, METRICS_INDEXES)
