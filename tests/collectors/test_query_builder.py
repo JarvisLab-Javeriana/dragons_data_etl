@@ -50,13 +50,20 @@ def test_build_client_articles_query_includes_filters():
         "start_date",
         "end_date",
         "keywords",
+        "apply_tags",
         "tags",
+        "apply_media",
         "media",
+        "apply_languages",
         "languages",
         "row_limit",
     }
     assert "TranslationInfo" in prepared.sql
     assert "srclc:spa" in prepared.sql
+    flags = {p.name: p.value for p in prepared.parameters if p.name.startswith("apply_")}
+    assert flags["apply_tags"] is True
+    assert flags["apply_media"] is True
+    assert flags["apply_languages"] is True
 
 
 def test_build_columns_query_uses_scalar_table_name_parameter():

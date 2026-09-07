@@ -101,14 +101,20 @@ def build_client_articles_query(
     media: list[str] | None = None,
     languages: list[str] | None = None,
 ) -> PreparedQuery:
+    tags = [t for t in (tags or []) if t]
+    media = [m for m in (media or []) if m]
+    languages = [lang for lang in (languages or []) if lang]
     sql = _interpolate_identifiers(_read_sql("extraction/articles_client.sql"), dataset)
     parameters = [
         bigquery.ScalarQueryParameter("start_date", "DATE", start_date),
         bigquery.ScalarQueryParameter("end_date", "DATE", end_date),
         bigquery.ArrayQueryParameter("keywords", "STRING", keywords),
-        bigquery.ArrayQueryParameter("tags", "STRING", tags or []),
-        bigquery.ArrayQueryParameter("media", "STRING", media or []),
-        bigquery.ArrayQueryParameter("languages", "STRING", languages or []),
+        bigquery.ScalarQueryParameter("apply_tags", "BOOL", bool(tags)),
+        bigquery.ArrayQueryParameter("tags", "STRING", tags or [""]),
+        bigquery.ScalarQueryParameter("apply_media", "BOOL", bool(media)),
+        bigquery.ArrayQueryParameter("media", "STRING", media or [""]),
+        bigquery.ScalarQueryParameter("apply_languages", "BOOL", bool(languages)),
+        bigquery.ArrayQueryParameter("languages", "STRING", languages or [""]),
         bigquery.ScalarQueryParameter("row_limit", "INT64", row_limit),
     ]
     return PreparedQuery(
