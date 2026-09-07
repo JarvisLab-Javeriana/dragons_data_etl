@@ -101,8 +101,19 @@ def test_run_writes_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_media_domains_expands_aliases():
-    assert "bbc.com" in client.media_domains(["bbc", "reuters"])
-    assert "reuters.com" in client.media_domains(["bbc", "reuters"])
+    domains = client.media_domains(["bbc", "reuters"])
+    assert "bbc" in domains
+    assert "bbc.com" in domains
+    assert "reuters.com" in domains
+
+
+def test_expand_tags_maps_environment_to_env():
+    assert "env" in client.expand_tags(["environment"])
+
+
+def test_languages_for_query_skips_all_three():
+    assert client.languages_for_query(["en", "es", "hu"]) == []
+    assert client.languages_for_query(["es"]) == ["es"]
 
 
 def test_parse_args_default_limit_and_languages():

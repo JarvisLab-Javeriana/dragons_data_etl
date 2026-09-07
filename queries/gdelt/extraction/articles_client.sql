@@ -24,7 +24,7 @@ WHERE
       OR LOWER(IFNULL(V2Organizations, '')) LIKE CONCAT('%', LOWER(kw), '%')
   )
   AND (
-    ARRAY_LENGTH(@tags) = 0
+    @apply_tags IS FALSE
     OR EXISTS (
       SELECT 1
       FROM UNNEST(@tags) AS tag
@@ -32,7 +32,7 @@ WHERE
     )
   )
   AND (
-    ARRAY_LENGTH(@media) = 0
+    @apply_media IS FALSE
     OR EXISTS (
       SELECT 1
       FROM UNNEST(@media) AS outlet
@@ -42,7 +42,7 @@ WHERE
     )
   )
   AND (
-    ARRAY_LENGTH(@languages) = 0
+    @apply_languages IS FALSE
     OR EXISTS (
       SELECT 1
       FROM UNNEST(@languages) AS lang

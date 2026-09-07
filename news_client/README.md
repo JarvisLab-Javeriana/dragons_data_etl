@@ -45,3 +45,9 @@ set GOOGLE_APPLICATION_CREDENTIALS=C:\Users\vivgo\Downloads\dragons-data-etl-e4c
 ```
 
 Los resultados quedan en `results.json`.
+
+El pipeline de Mongo busca solo **keywords + fechas** (p. ej. `biodiversity` en temas GKG como `ENV_BIODIVERSITY`). El cliente, si copia `--tags environment` tal cual, no encontraba nada: GDELT no usa la palabra "environment". Ahora `environment` se traduce a `env` (coincide con `ENV_*`). Si pide los tres idiomas, **no** se filtra por `TranslationInfo` (igual que Mongo). Para una prueba igual al ETL:
+
+```text
+.venv\Scripts\python.exe news_client\client.py --credentials "C:\Users\vivgo\Downloads\dragons-data-etl-e4c3aa1016a0.json" --keywords "biodiversity" --start-date 2015-02-01 --end-date 2026-06-30 --limit 100
+```

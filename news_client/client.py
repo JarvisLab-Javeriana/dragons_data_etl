@@ -31,6 +31,10 @@ MEDIA_DOMAINS = {
     "index": ("index.hu",),
     "telex": ("telex.hu",),
 }
+TAG_ALIASES = {
+    "environment": ("environment", "env"),
+    "science": ("science", "sci"),
+}
 DEFAULT_LIMIT = 100
 DEFAULT_OUTPUT = "results.json"
 GDELT_PROJECT = "gdelt-bq"
@@ -222,12 +226,44 @@ def media_domains(media: list[str]) -> list[str]:
         if not key:
             continue
         mapped = MEDIA_DOMAINS.get(key)
-        candidates = list(mapped) if mapped else ([key] if "." in key else [key, f"{key}.com"])
+        candidates = [key]
+        if mapped:
+            candidates.extend(mapped)
+        elif "." not in key:
+            candidates.append(f"{key}.com")
         for domain in candidates:
             if domain not in seen:
                 seen.add(domain)
                 domains.append(domain)
     return domains
+
+
+def expand_tags(tags: list[str]) -> list[str]:
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for tag in tags:
+        key = tag.strip().lower()
+        if not key:
+            continue
+        pieces = TAG_ALIASES.get(key, (key,))
+        for piece in pieces:
+            if piece not in seen:
+                seen.add(piece)
+                expanded.append(piece)
+    return expanded
+
+
+def languages_for_query(languages: list[str]) -> list[str]:
+    """Skip GKG language filter when all supported languages are requested.
+
+    That matches the Mongo pipeline (keywords + dates only). TranslationInfo
+    is empty for English and rarely filled, so filtering en+es+hu as AND/OR
+    on that field often returns zero rows.
+    """
+    selected = {code.lower() for code in languages}
+    if not selected or selected >= set(SUPPORTED_LANGUAGES):
+        return []
+    return [code for code in languages if code in SUPPORTED_LANGUAGES]
 
 
 def apply_credentials(credentials_path: str | None) -> None:
@@ -279,13 +315,16 @@ def fetch_records(query: dict[str, Any], credentials_path: str | None = None) ->
         end_date=end_exclusive,
         keywords=query["keywords"],
         row_limit=int(query["limit"]),
-        tags=query.get("tags") or [],
+        tags=expand_tags(query.get("tags") or []),
         media=media_domains(query.get("media") or []),
-        languages=query.get("languages") or [],
+        languages=languages_for_query(query.get("languages") or []),
     )
+    lang_sql = languages_for_query(query.get("languages") or [])
     logger.info(
-        "Consultando BigQuery GDELT (idiomas=%s, limit=%s)",
-        ",".join(query.get("languages") or []),
+        "Consultando BigQuery GDELT (filtro_idioma=%s, tags=%s, media=%s, limit=%s)",
+        lang_sql or "ninguno (igual que el pipeline Mongo)",
+        query.get("tags") or [],
+        query.get("media") or [],
         query["limit"],
     )
 
