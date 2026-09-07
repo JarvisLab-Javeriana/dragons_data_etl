@@ -120,3 +120,28 @@ def build_client_articles_query(
     return PreparedQuery(
         sql=sql, parameters=parameters, description="GKG article extraction for news_client"
     )
+
+
+def build_event_articles_query(
+    dataset: DatasetConfig,
+    start_date: date,
+    end_date: date,
+    keywords: list[str],
+    row_limit: int,
+    locations: list[str] | None = None,
+) -> PreparedQuery:
+    locations = [item for item in (locations or []) if item]
+    sql = _interpolate_identifiers(_read_sql("extraction/articles_by_event.sql"), dataset)
+    parameters = [
+        bigquery.ScalarQueryParameter("start_date", "DATE", start_date),
+        bigquery.ScalarQueryParameter("end_date", "DATE", end_date),
+        bigquery.ArrayQueryParameter("keywords", "STRING", keywords),
+        bigquery.ScalarQueryParameter("apply_locations", "BOOL", bool(locations)),
+        bigquery.ArrayQueryParameter("locations", "STRING", locations or [""]),
+        bigquery.ScalarQueryParameter("row_limit", "INT64", row_limit),
+    ]
+    return PreparedQuery(
+        sql=sql,
+        parameters=parameters,
+        description="GKG article extraction for a biodiversity event",
+    )

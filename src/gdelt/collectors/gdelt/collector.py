@@ -129,6 +129,38 @@ class GdeltCollector:
 
         return GdeltCollectionResult(rows=result.rows, metrics=result.metrics)
 
+    def collect_event_articles(
+        self,
+        *,
+        start_date,
+        end_date,
+        keywords: list[str],
+        row_limit: int,
+        locations: list[str] | None = None,
+    ) -> GdeltCollectionResult:
+        prepared = query_builder.build_event_articles_query(
+            self.config.dataset,
+            start_date,
+            end_date,
+            keywords,
+            row_limit,
+            locations=locations,
+        )
+        if self.config.max_bytes_billed is not None:
+            estimated = self.bq_client.estimate_bytes(prepared)
+            if estimated > self.config.max_bytes_billed:
+                raise ResourceLimitError(
+                    f"Estimated bytes processed ({estimated}) exceeds "
+                    f"configured max_bytes_billed ({self.config.max_bytes_billed}).",
+                    stage="bigquery",
+                )
+        result = self.bq_client.run_query(
+            prepared,
+            max_bytes_billed=self.config.max_bytes_billed,
+            page_size=self.config.batch_size,
+        )
+        return GdeltCollectionResult(rows=result.rows, metrics=result.metrics)
+
     def close(self) -> None:
         self.bq_client.close()
 
