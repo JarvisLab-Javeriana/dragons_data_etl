@@ -66,6 +66,31 @@ def test_build_client_articles_query_includes_filters():
     assert flags["apply_languages"] is True
 
 
+def test_build_event_articles_query_includes_location_filter():
+    prepared = query_builder.build_event_articles_query(
+        DATASET,
+        start_date=date(2016, 6, 1),
+        end_date=date(2016, 7, 1),
+        keywords=["Brexit environment"],
+        row_limit=100,
+        locations=["united kingdom", "uk"],
+    )
+    param_names = {p.name for p in prepared.parameters}
+    assert param_names == {
+        "start_date",
+        "end_date",
+        "keywords",
+        "apply_locations",
+        "locations",
+        "row_limit",
+    }
+    assert "V2Locations" in prepared.sql
+    flags = {p.name: p.value for p in prepared.parameters if p.name.startswith("apply_")}
+    assert flags["apply_locations"] is True
+    limit = next(p.value for p in prepared.parameters if p.name == "row_limit")
+    assert limit == 100
+
+
 def test_build_columns_query_uses_scalar_table_name_parameter():
     prepared = query_builder.build_columns_query(DATASET, table_name="gkg_partitioned")
     assert len(prepared.parameters) == 1
