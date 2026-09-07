@@ -200,6 +200,31 @@ Contains the main application code for the ETL component, including source colle
 ### `tests/`
 
 Contains unit and integration tests used to validate source connectors, processing logic, persistence, and other ETL components.
+
+---
+
+## Event pipeline (GDELT + scraper)
+
+Collections in MongoDB (`MONGODB_DATABASE`, default `dragons`):
+
+- `eventos` — seeded from [`data/events/DRAGONS_T1.csv`](data/events/DRAGONS_T1.csv) (68 events; skip the title row).
+- `queries` — one BigQuery statement per event (`id`, `id_evento`, `consulta`).
+- `whitelist` — up to **100** GKG rows per query (`id`, `hash`, `url`, full GKG payload, `id_query`, `id_scrapper`, `id_metric`).
+- `metrics` — one document per query (same counters as the previous execution metrics, plus `id` and `id_query`).
+- `scrapper` — article content from the news extractor (`id`, `hash_whitelist`, `contenido`).
+
+Configure Atlas locally in `.env` (see `.env.example`). Do not commit `.env`.
+
+```text
+python scripts/seed_events.py
+python scripts/run_gdelt.py --max-events 1 --skip-scrape
+python scripts/run_gdelt.py --event-id UK-01 --event-id CO-01 --row-limit 100
+```
+
+`--max-events` / `--event-id` keep the Atlas free-tier sample small. Full 68 events × 100 rows plus HTML can exceed M0 storage.
+
+The HTML extractor lives in `src/gdelt/collectors/web/news_extractor.py` (from `test/news-scraper-pipeline`).
+
 ---
 
 ## Relationship with DRAGONS Data Analytics
