@@ -1,71 +1,71 @@
-# Banderas disponibles — `news_extractor.py`
+# Available Flags — `news_extractor.py`
 
-El scraper soporta actualmente las siguientes banderas:
+The scraper currently supports the following flags:
 
-| Bandera | Valor por defecto | Descripción |
-|---|---:|---|
-| `--whitelist` | `white_list` | Carpeta raíz donde están los CSV de la whitelist. |
-| `--database` | `MONGODB_DATABASE` o `dragons_app` | Base de datos de MongoDB donde se guardan las noticias y auditorías. |
-| `--collection` | `MONGODB_COLLECTION` o `news` | Colección de MongoDB donde se guardan las noticias. |
-| `--audit-collection` | `MONGODB_AUDIT_COLLECTION` o `audit_runs` | Colección donde se guardan las auditorías de cada ejecución. |
-| `--audit-progress-every` | `100` | Actualiza el progreso de la auditoría cada N registros. Usa `0` para desactivar los checkpoints periódicos. |
-| `--delay` | `2.5` | Tiempo mínimo, en segundos, entre solicitudes al mismo dominio. |
-| `--timeout` | `20` | Timeout, en segundos, para la descarga del artículo y el fallback con navegador. |
-| `--robots-timeout` | `5` | Timeout, en segundos, para consultar `robots.txt`. |
-| `--resume` | desactivado | Salta documentos que ya existen en MongoDB según `eid + language + keywords`. |
-| `--skip-empty-content` | desactivado | No guarda en MongoDB noticias cuyo campo `contenido` no pudo ser extraído. |
+| Flag                     |                              Default value | Description                                                                                            |
+| ------------------------ | -----------------------------------------: | ------------------------------------------------------------------------------------------------------ |
+| `--whitelist`            |                               `white_list` | Root directory containing the whitelist CSV files.                                                     |
+| `--database`             |        `MONGODB_DATABASE` or `dragons_app` | MongoDB database where news articles and audit records are stored.                                     |
+| `--collection`           |             `MONGODB_COLLECTION` or `news` | MongoDB collection where news articles are stored.                                                     |
+| `--audit-collection`     | `MONGODB_AUDIT_COLLECTION` or `audit_runs` | Collection where audit information for each execution is stored.                                       |
+| `--audit-progress-every` |                                      `100` | Updates audit progress every N records. Use `0` to disable periodic checkpoints.                       |
+| `--delay`                |                                      `2.5` | Minimum delay, in seconds, between requests to the same domain.                                        |
+| `--timeout`              |                                       `20` | Timeout, in seconds, for article downloads and browser fallback operations.                            |
+| `--robots-timeout`       |                                        `5` | Timeout, in seconds, for retrieving the `robots.txt` file.                                             |
+| `--resume`               |                                   Disabled | Skips documents that already exist in MongoDB based on `eid + language + keywords`.                    |
+| `--skip-empty-content`   |                                   Disabled | Prevents news articles from being stored in MongoDB when the `contenido` field could not be extracted. |
 
-## Ejemplos
+## Examples
 
-### Ejecución normal
+### Standard execution
 
 ```bash
 python news_extractor.py
 ```
 
-### Continuar sin volver a scrapear documentos existentes
+### Resume execution without scraping existing documents again
 
 ```bash
 python news_extractor.py --resume
 ```
 
-### No guardar noticias sin contenido
+### Do not store news articles without extracted content
 
 ```bash
 python news_extractor.py --skip-empty-content
 ```
 
-### Actualizar la auditoría cada 10 registros
+### Update audit progress every 10 records
 
 ```bash
 python news_extractor.py --audit-progress-every 10
 ```
 
-### Cambiar timeouts
+### Change the timeout values
 
 ```bash
 python news_extractor.py --timeout 10 --robots-timeout 3
 ```
 
-### Cambiar el delay por dominio
+### Change the per-domain delay
 
 ```bash
 python news_extractor.py --delay 1.5
 ```
 
-### Usar otra whitelist
+### Use a different whitelist directory
 
 ```bash
-python news_extractor.py --whitelist otra_white_list
+python news_extractor.py --whitelist another_white_list
 ```
 
-### Usar otra colección
+### Use a different MongoDB collection
 
 ```bash
 python news_extractor.py --collection news_test
 ```
 
-### Combinar banderas
+### Combine multiple flags
 
 ```bash
 python news_extractor.py \
@@ -75,16 +75,16 @@ python news_extractor.py \
   --timeout 10
 ```
 
-## Con Docker
+## Running with Docker
 
-Solo se agregan las banderas después del comando del script:
+Add the flags after the script command:
 
 ```bash
 docker compose run --rm scraper \
   python news_extractor.py --resume
 ```
 
-Ejemplo completo:
+Complete example:
 
 ```bash
 docker compose run --rm scraper \
@@ -94,15 +94,15 @@ docker compose run --rm scraper \
   --audit-progress-every 10
 ```
 
-## Ver ayuda desde terminal
+## Displaying command-line help
 
-Puedes consultar todas las opciones disponibles con:
+To view all available options, run:
 
 ```bash
 python news_extractor.py --help
 ```
 
-o usando Docker:
+Alternatively, using Docker:
 
 ```bash
 docker compose run --rm scraper python news_extractor.py --help
