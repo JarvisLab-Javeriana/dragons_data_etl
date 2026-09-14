@@ -140,26 +140,86 @@ The current repository structure is organised as follows:
 ```text
 dragons_data_etl/
 │
-├── config/                       # General project and source configuration
+├── config/
+│   ├── settings/
+│   │   ├── logging.yaml          # Logging configuration
+│   │   ├── mongodb.yaml          # MongoDB connection and persistence settings
+│   │   └── pipeline.yaml         # General ETL pipeline configuration
+│   │
+│   └── sources/
+│       ├── crawler.yaml          # Web crawling source configuration
+│       ├── gdelt.yaml            # GDELT source configuration
+│       ├── newspapers.yaml       # Newspaper source definitions
+│       └── social_media.yaml     # Social media source definitions
 │
-├── docs/                         # Technical and data model documentation
+├── data/
+│   ├── events/
+│   │   └── DRAGONS_T1.1_Biodiversity_events_2016-2026_v2.xlsx
+│   │                              # Biodiversity events used as temporal/contextual references
+│   │
+│   ├── samples/                   # Small reproducible samples for validation and inspection
+│   │
+│   └── DRAGONS T1_1_1_DA_Keywords_Methodology.xlsx
+│                                  # Keyword and search methodology reference
 │
-├── experiments/
-│   └── source_discovery/         # Exploratory source assessment and discovery artifacts
+├── gdelt/
+│   ├── logs/
+│   │   └── dragons_data_etl.log  # GDELT-specific execution log
+│   │
+│   └── scripts/
+│       └── test_gdelt_history.py # Historical GDELT extraction experiment
 │
-├── gdelt/                        # GDELT-specific implementation and supporting resources
+├── logs/
+│   ├── dragons_data_etl.crawled_data.csv
+│   │                              # Results from web content retrieval attempts
+│   ├── dragons_data_etl.execution_metrics.csv
+│   │                              # Pipeline execution and performance metrics
+│   ├── dragons_data_etl.gkg_records.csv
+│   │                              # Exported GDELT GKG sample records
+│   └── dragons_data_etl.log      # General ETL execution log
 │
-├── logs/                         # Execution and processing logs
+├── news_client/
+│   ├── README.md                 # News client documentation
+│   ├── client.py                 # News retrieval client implementation
+│   └── test_client.py            # News client tests
 │
 ├── queries/
-│   └── gdelt/                    # Versioned queries used for GDELT acquisition
+│   └── gdelt/
+│       ├── analysis/
+│       │   ├── keyword_count.sql # Keyword-level analytical queries
+│       │   └── yearly_count.sql  # Temporal aggregation by year
+│       │
+│       ├── extraction/
+│       │   ├── articles.sql
+│       │   ├── articles_by_event.sql
+│       │   └── articles_client.sql
+│       │                          # Queries used to retrieve GDELT records
+│       │
+│       └── metadata/
+│           ├── columns.sql
+│           ├── min_max_date.sql
+│           └── tables.sql
+│                                  # Metadata inspection queries
 │
-├── scripts/                      # Operational and execution scripts
+├── scripts/
+│   ├── gdelt/
+│   │   └── test_gdelt_history.py # GDELT historical extraction testing
+│   │
+│   ├── mediacloud/
+│   │   └── Mediacloud_export.ipynb
+│   │                              # MediaCloud news consolidation and exploratory analysis
+│   │
+│   ├── export_mongo_sample.py    # Export MongoDB samples for inspection
+│   ├── run_crawler.py            # Execute the web crawler
+│   ├── run_gdelt.py              # Execute GDELT acquisition workflow
+│   ├── seed_events.py            # Load biodiversity events into the processing workflow
+│   └── test_gdelt_history.py     # Historical GDELT test script
 │
 ├── src/                          # Core ETL implementation
 │
 ├── tests/                        # Unit and integration tests
 │
+├── .env.example                  # Example environment variables
 ├── LICENSE
 └── README.md
 ```
